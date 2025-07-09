@@ -203,7 +203,7 @@ class TrainSegNet():
         '''
         images = []
         for i in range(self.batch_size):
-            image = np.zeros(shape=(256, 256, 3) ,dtype=np.float)
+            image = np.zeros(shape=(256, 256, 3) ,dtype=float)
             for j in range(7):
                 image = apply_stroke(image, seg_result[i, j].detach().to('cpu').numpy()>0.5, seg_colors[j])
             images.append(image.transpose((2,0,1)))

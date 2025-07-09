@@ -30,8 +30,8 @@ class SegNet(nn.Module):
         self.de_residual_block_128 = DeBasicBlock(64, 16, stride=2, groups=1) # 128
         self.de_residual_block_256 = DeBasicBlock(16, 16, stride=2, groups=1) # 128
 
-        self.out_conv = nn.Conv2d(16+3, 7, kernel_size=(3, 3), padding=(1, 1))
-
+        # self.out_conv = nn.Conv2d(16+3, 7, kernel_size=(3, 3), padding=(1, 1))
+        self.out_conv = nn.Conv2d(16+3, 30, kernel_size=(3, 3), padding=(1, 1))
         self.aspp = ASPP(256, 256)
 
     def forward(self, target_data, reference_data):
