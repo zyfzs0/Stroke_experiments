@@ -261,12 +261,28 @@ class SegNetExtractNetLoader(data.Dataset):
             targets.append(row['target'])
             stroke_labels.append(row['stroke'])  # 真实笔画编号（1-based）
         
+
+        
+        n = len(strokes)
+         # 转换为固定大小 (30, 256, 256)
+        max_strokes = 30
+        # 仅当 n > max_strokes 时进行截断
+        if n > max_strokes:
+            strokes = strokes[:max_strokes]
+            ref_strokes = ref_strokes[:max_strokes]
+            stroke_labels = stroke_labels[:max_strokes]
+            stroke_orders = stroke_orders[:max_strokes]
+        
         # 将所有笔画堆叠成一个张量
         strokes_tensor = torch.cat(strokes,dim=0)
         ref_strokes_tensor = torch.cat(ref_strokes,dim=0)
         stroke_labels_tensor = torch.tensor(stroke_labels, dtype=torch.long)
         stroke_orders_tensor = torch.tensor(stroke_orders, dtype=torch.long)
-    
+        
+        # 转换为固定大小 (30, 256, 256)
+        max_strokes = 30
+        final_strokes_tensor = torch.zeros(max_strokes, 256, 256, dtype=strokes_tensor.dtype)
+        final_strokes_tensor[:len(strokes)] = strokes_tensor  # 填充实际笔画
         
         # reference_color = np.load(self.path[item][0])  # (3, 256, 256)
         # label_seg = np.load(self.path[item][1])[1:]  # (7, 256, 256)
@@ -278,12 +294,13 @@ class SegNetExtractNetLoader(data.Dataset):
         # reference_segment_transformation_data = self.get_seg_image(reference_transformed_single, seg_id)
         # label_seg = self.get_seg_image(target_single_stroke, seg_id)
 
+        # print(ref_img.shape,stroke_labels_tensor.shape,strokes_tensor.shape,stroke_labels)
 
         if self.is_single:  # For ExtractNet
             return {
-                'target_data': char_img,
+                'target_data': ref_img,
                 'reference_color':ref_img,
-                'label_seg': stroke_labels_tensor,
+                'label_seg': final_strokes_tensor,
                 'reference_segment_transformation_data':stroke_labels_tensor,
                 'seg_id':stroke_labels,
                 'reference_transformed_single': strokes_tensor,
@@ -293,9 +310,9 @@ class SegNetExtractNetLoader(data.Dataset):
         else:  # For SegNet
             return {
 
-                'target_data':  char_img,
+                'target_data':  ref_img,
                 'reference_color': ref_img,
-                'label_seg':stroke_labels_tensor
+                'label_seg':final_strokes_tensor
             }
 
     def __len__(self):
