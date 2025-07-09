@@ -5,3 +5,5 @@
 *.pth
 StrokeExtraction/content_net_model/out/model_content.pth
 StrokeExtraction/char_recognise/out_vgg_bn/model/model.pth
+/*__pycache__
+*pyc
