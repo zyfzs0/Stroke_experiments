@@ -451,10 +451,10 @@ class TrainExtractNet():
             loss_list.append([loss.item(), mIOUm.item(), mIOUum.item()])
             if (i+1)%5==0 and (epoch+1)%1==0:
                 # save data
-                extract_result_show = np.zeros(shape=(256, 256, 3), dtype=np.float) + target_data_o.squeeze().detach().to(
+                extract_result_show = np.zeros(shape=(256, 256, 3), dtype=float) + target_data_o.squeeze().detach().to(
                                                     'cpu').numpy().transpose(1, 2, 0)
 
-                label_result_show = np.zeros(shape=(256, 256, 3),dtype=np.float) + target_data_o.squeeze().detach().to(
+                label_result_show = np.zeros(shape=(256, 256, 3),dtype=float) + target_data_o.squeeze().detach().to(
                                                         'cpu').numpy().transpose(1, 2, 0)
 
                 r_colors = random_colors(len(extract_result))

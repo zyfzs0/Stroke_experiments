@@ -55,15 +55,15 @@ class SDNet(nn.Module):
         @return:
         '''
         grid_ = (grid.detach().to('cpu').numpy()+1)*127.5
-        x = np.array([grid_[0, :, 0, 0], grid_[0, :, 0, 255], grid_[0, :, 255, 0]], dtype=np.float)
-        y = np.array([[0, 0], [255, 0], [0, 255]], dtype=np.float)
-        expand = np.ones(shape=(3, 1), dtype=np.float)
+        x = np.array([grid_[0, :, 0, 0], grid_[0, :, 0, 255], grid_[0, :, 255, 0]], dtype=float)
+        y = np.array([[0, 0], [255, 0], [0, 255]], dtype=float)
+        expand = np.ones(shape=(3, 1), dtype=float)
         x = np.concatenate([x, expand], axis=1)
         map = np.dot(np.linalg.inv(x), y)
-        grid_base = self.coordinate.reshape((2, -1)).transpose((1, 0)).astype(np.float)
-        grid_base = np.concatenate([grid_base, np.ones(shape=(256*256, 1), dtype=np.float)], axis=1)
+        grid_base = self.coordinate.reshape((2, -1)).transpose((1, 0)).astype(float)
+        grid_base = np.concatenate([grid_base, np.ones(shape=(256*256, 1), dtype=float)], axis=1)
         d_grid = np.round(np.dot(grid_base, map)).astype(np.int)
-        d_grid = np.clip(d_grid[:, ], 0, 255).reshape((1, 256, 256, 2)).transpose((0, 3, 1, 2 )).astype(np.float)
+        d_grid = np.clip(d_grid[:, ], 0, 255).reshape((1, 256, 256, 2)).transpose((0, 3, 1, 2 )).astype(float)
         d_grid = d_grid / 127.5 - 1
         return torch.from_numpy(d_grid).float().cuda()
 

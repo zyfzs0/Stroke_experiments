@@ -47,7 +47,7 @@ class SegNetExtractNetLoader_old(data.Dataset):
         print("number of dataset：%d"%len(self.path))
 
     def get_seg_image(self, reference_single, seg_label):
-        reference_image = np.zeros(shape=(7, 256, 256), dtype=np.float)
+        reference_image = np.zeros(shape=(7, 256, 256), dtype=float)
         for i in range(seg_label.shape[0]):
             id_7 = seg_label_to7(seg_label[i])
             reference_image[id_7] += reference_single[i]
@@ -62,7 +62,7 @@ class SegNetExtractNetLoader_old(data.Dataset):
         seg_id = np.load(self.path[item][2])     # (N)
         reference_transformed_single = np.load(self.path[item][3])  # (N, 256 256)
         target_single_stroke = np.load(self.path[item][4])  # (N, 256 256)
-        target_data = np.repeat(target_image, 3, axis=0).astype(np.float)
+        target_data = np.repeat(target_image, 3, axis=0).astype(float)
         reference_segment_transformation_data = self.get_seg_image(reference_transformed_single, seg_id)
         label_seg = self.get_seg_image(target_single_stroke, seg_id)
 
@@ -186,7 +186,7 @@ class SegNetExtractNetLoader(data.Dataset):
         # print("number of dataset：%d"%len(self.path))
 
     def get_seg_image(self, reference_single, seg_label):
-        reference_image = np.zeros(shape=(7, 256, 256), dtype=np.float)
+        reference_image = np.zeros(shape=(7, 256, 256), dtype=float)
         for i in range(seg_label.shape[0]):
             id_7 = seg_label_to7(seg_label[i])
             reference_image[id_7] += reference_single[i]
