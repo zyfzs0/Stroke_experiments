@@ -62,7 +62,7 @@ class SDNet(nn.Module):
         map = np.dot(np.linalg.inv(x), y)
         grid_base = self.coordinate.reshape((2, -1)).transpose((1, 0)).astype(float)
         grid_base = np.concatenate([grid_base, np.ones(shape=(256*256, 1), dtype=float)], axis=1)
-        d_grid = np.round(np.dot(grid_base, map)).astype(np.int)
+        d_grid = np.round(np.dot(grid_base, map)).astype(int)
         d_grid = np.clip(d_grid[:, ], 0, 255).reshape((1, 256, 256, 2)).transpose((0, 3, 1, 2 )).astype(float)
         d_grid = d_grid / 127.5 - 1
         return torch.from_numpy(d_grid).float().cuda()
