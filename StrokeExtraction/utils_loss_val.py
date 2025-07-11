@@ -94,7 +94,11 @@ def get_centroid_box_qualitative_result(kaiti, style):
     '''
     def centroid_box(img):
         point = np.where(img > 0.5)
+        if len(point[0]) == 0:  # 如果是空笔画
+            # print("警告：检测到空笔画，返回默认值")
+            return np.array([128, 128]), np.array([0, 255, 0, 255])  # 返回图像中心点和全图范围
         center = np.array([np.mean(point[1]), np.mean(point[0])])
+        
         box = np.array([np.min(point[1]), np.max(point[1]),np.min(point[0]), np.max(point[0])]) # xl,xr,yt.yb
         return center, box
 
