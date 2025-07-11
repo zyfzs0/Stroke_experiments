@@ -23,7 +23,7 @@ def random_colors(N, bright=True):
     return colors
 
 
-seg_colors = random_colors(24)
+seg_colors = random_colors(30)
 
 
 def apply_stroke(image, mask, color):
