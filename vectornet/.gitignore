@@ -1,0 +1,12 @@
+*.pyc
+*.suo
+*.o
+*~
+*.sql
+*.db
+*.opendb
+*.user
+log/
+data/
+potrace/
+gco/build
