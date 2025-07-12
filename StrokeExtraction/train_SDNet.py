@@ -279,8 +279,15 @@ class TrainSDNet():
 
     def __get_color_image(self, single_image, stroke_label):
         color_kaiti = np.zeros(shape=(256, 256, 3))
+        # print(single_image.shape[0],len(single_image),len(stroke_label),len(seg_colors))
         for i in range(single_image.shape[0]):
-            color_kaiti = apply_stroke(color_kaiti, single_image[i], seg_colors[stroke_label[i]])
+            r1 =i
+            if r1>=len(single_image):
+                r1 =len(single_image) -1
+            r2  = stroke_label[i]
+            if r2>=len(seg_colors):
+                r2 = len(seg_colors)-1
+            color_kaiti = apply_stroke(color_kaiti, single_image[r1], seg_colors[stroke_label[i]])
         color_kaiti = np.transpose(color_kaiti, [2, 0, 1])
         return torch.from_numpy(color_kaiti).float().cuda().unsqueeze(0)
 

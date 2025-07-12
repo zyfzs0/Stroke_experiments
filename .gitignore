@@ -11,3 +11,4 @@ StrokeExtraction/char_recognise/out_vgg_bn/model/model.pth
 */.idea*
 *__pycache__*
 *.npy
+*.svg
