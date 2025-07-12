@@ -45,7 +45,7 @@ class SDNetLoader_old(data.Dataset):
         expand_zeros = []
         expand_single_centroid = []
 
-        for i in range(30):
+        for i in range(33):
             if i >= reference_single_image.shape[0]:
                 expand_zeros.append(np.zeros(shape=(256, 256), dtype=float))
                 expand_single_centroid.append(np.array([127.5, 127.5]))
@@ -283,8 +283,8 @@ class SDNetLoader(data.Dataset):
         centroids_tensor = torch.stack(centroids)
         stroke_orders_tensor = torch.tensor(stroke_orders, dtype=torch.long)
         stroke_labels_tensor = torch.tensor(stroke_labels, dtype=torch.long)
-        # 填充到30个笔画
-        max_strokes = 30
+        # 填充到33个笔画
+        max_strokes = 33
         num_strokes = len(strokes)
         num_real_strokes = len(strokes)
         

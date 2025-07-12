@@ -264,8 +264,8 @@ class SegNetExtractNetLoader(data.Dataset):
 
         
         n = len(strokes)
-         # 转换为固定大小 (30, 256, 256)
-        max_strokes = 30
+         # 转换为固定大小 (33, 256, 256)
+        max_strokes = 33
         # 仅当 n > max_strokes 时进行截断
         if n > max_strokes:
             strokes = strokes[:max_strokes]
@@ -279,8 +279,8 @@ class SegNetExtractNetLoader(data.Dataset):
         stroke_labels_tensor = torch.tensor(stroke_labels, dtype=torch.long)
         stroke_orders_tensor = torch.tensor(stroke_orders, dtype=torch.long)
         
-        # 转换为固定大小 (30, 256, 256)
-        max_strokes = 30
+        # 转换为固定大小 (33, 256, 256)
+        max_strokes = 33
         final_strokes_tensor = torch.zeros(max_strokes, 256, 256, dtype=strokes_tensor.dtype)
         final_strokes_tensor[:len(strokes)] = strokes_tensor  # 填充实际笔画
         
@@ -301,7 +301,7 @@ class SegNetExtractNetLoader(data.Dataset):
                 'target_data': ref_img,
                 'reference_color':ref_img,
                 'label_seg': final_strokes_tensor,
-                'reference_segment_transformation_data':stroke_labels_tensor,
+                'reference_segment_transformation_data':final_strokes_tensor,
                 'seg_id':stroke_labels,
                 'reference_transformed_single': strokes_tensor,
                 'target_single_stroke': strokes_tensor

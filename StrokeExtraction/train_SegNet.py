@@ -13,7 +13,7 @@ from utils import save_picture, random_colors, apply_stroke
 from utils_loss_val import get_mean_IOU
 
 
-seg_colors = random_colors(30)
+seg_colors = random_colors(33)
 
 
 class TrainSegNet():

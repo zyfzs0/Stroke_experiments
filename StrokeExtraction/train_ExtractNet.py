@@ -299,6 +299,7 @@ class TrainExtractNet():
 
             # Reference Segment Transformation Data
             kaiti_seg_in = reference_segment_transformation_data[:, id_7:id_7 + 1].detach().float()
+            # print("kaiti_seg_in shape:", kaiti_seg_in.shape) 
             kaiti_seg_in = torch_resize(kaiti_seg_in[:, :, y_t:y_b, x_l:x_r])
             kaiti_trans_seg_stage2_in.append(kaiti_seg_in)
 
@@ -499,5 +500,5 @@ class TrainExtractNet():
 
 
 if __name__ == '__main__':
-    model = TrainExtractNet(save_path='out/ExtractNet_CCSEDB', segNet_save_path='out/SegNet_CCSEDB')
-    model.train_model(epochs=20, init_learning_rate=0.0001, batch_size=8, dataset=r'dataset_forSegNet_ExtractNet_CCSEDB')
+    model = TrainExtractNet(save_path='out/ExtractNet_RHSEDB', segNet_save_path='out/SegNet_RHSEDB')
+    model.train_model(epochs=20, init_learning_rate=0.0001, batch_size=4, dataset=r'dataset_forSegNet_ExtractNet_RHSEDB')

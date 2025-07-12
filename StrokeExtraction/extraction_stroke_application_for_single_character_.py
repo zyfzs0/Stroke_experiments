@@ -293,7 +293,7 @@ class ExtractStroke():
 
         # reference single stroke centroid
         reference_single_centroid = []
-        for i in range(30):
+        for i in range(33):
             if i >= stroke_labels.shape[0]:
                 reference_single_centroid.append(np.array([127.5, 127.5]))
             else:

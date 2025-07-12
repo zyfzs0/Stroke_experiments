@@ -133,8 +133,8 @@ class TrainSDNet():
         for i in range(self.batch_size):
             linear_tran_whole = []
             for j in range(int(stroke_num[i])):
-                if j >=30:
-                    j = 30-1
+                if j >=33:
+                    j = 33-1
                 target_stroke_single_ = target_single_stroke[i][j].unsqueeze(0).unsqueeze(0)
                 reference_single_stroke_ = reference_single_stroke[i][j].unsqueeze(0).unsqueeze(0)
                 grid_ = grid_for_linear[i].unsqueeze(0)
@@ -301,7 +301,7 @@ class TrainSDNet():
         '''
         save prior information and other data for training SegNet and ExtractNet
         '''
-        style_image_save = torch.zeros(size=(30, 256, 256)).cuda().float()
+        style_image_save = torch.zeros(size=(33, 256, 256)).cuda().float()
         tran_kaiti_color_save = transformed_reference_color[0].detach().to('cpu').numpy()
         style_original_image_save = target_data[0]
         save_data = torch.cat([style_original_image_save, style_image_save], dim=0).detach().to(

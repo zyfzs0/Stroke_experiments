@@ -23,7 +23,7 @@ def random_colors(N, bright=True):
     return colors
 
 
-seg_colors = random_colors(30)
+seg_colors = random_colors(33)
 
 
 def apply_stroke(image, mask, color):
@@ -58,18 +58,15 @@ def save_picture(*args, title_list, path, nrow=8):
     save_image = (np.vstack(var_list)*255).astype(np.uint8)
     save_image = cv2.cvtColor(save_image, cv2.COLOR_BGR2RGB)
     for index, each_title in enumerate(title_list):
-        cv2.putText(save_image, each_title, (5, index*256+30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, color=(0, 0, 255))
+        cv2.putText(save_image, each_title, (5, index*256+33), cv2.FONT_HERSHEY_SIMPLEX, 1.0, color=(0, 0, 255))
     cv2.imwrite(path, save_image)
 
 
-CategoryOfStroke_to7 = [0,
-                         1,
-                         2,
-                         3, 3,
-                         4, 4, 5,
-                         5,  5, 5, 5, 5, 5, 5, 5,
-                         6, 6, 6, 2,
-                         4, 4, 4, 2]
+CategoryOfStroke_to7 = [
+    0, 1, 2, 3, 4, 5, 6,  # 原始7类
+    7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19,  # 新增13类
+    20, 21, 22, 23, 24, 25, 26, 27, 28, 29,30,31,32  # 新增10类
+]
 
 
 def seg_label_to7(id):
