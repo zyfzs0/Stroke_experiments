@@ -14,7 +14,7 @@ from utils_loss_val import get_mean_IOU
 
 
 seg_colors = random_colors(33)
-
+device = torch.device("cuda:1")
 
 class TrainSegNet():
     '''
@@ -40,7 +40,7 @@ class TrainSegNet():
 
         # SegNet
         self.seg_net = SegNet(out_feature=False)
-        self.seg_net.to('cuda')
+        self.seg_net.to(device)
 
     def save_model_parameter(self, epoch):
         # save models
@@ -107,9 +107,9 @@ class TrainSegNet():
                 print('Batch size error!')
                 continue
             # get data
-            reference_color = batch_sample['reference_color'].float().cuda()
-            label_seg = batch_sample['label_seg'].float().cuda()
-            target_data = batch_sample['target_data'].float().cuda()
+            reference_color = batch_sample['reference_color'].float().to(device)
+            label_seg = batch_sample['label_seg'].float().to(device)
+            target_data = batch_sample['target_data'].float().to(device)
 
             seg_out = self.seg_net(target_data, reference_color)
 
@@ -159,9 +159,9 @@ class TrainSegNet():
                 print('Batch size error!')
                 continue
             # get data
-            reference_color = batch_sample['reference_color'].float().cuda()
-            label_seg = batch_sample['label_seg'].float().cuda()
-            target_data = batch_sample['target_data'].float().cuda()
+            reference_color = batch_sample['reference_color'].float().to(device)
+            label_seg = batch_sample['label_seg'].float().to(device)
+            target_data = batch_sample['target_data'].float().to(device)
 
             seg_out = self.seg_net(target_data, reference_color)
 

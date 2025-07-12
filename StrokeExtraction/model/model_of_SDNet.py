@@ -8,6 +8,8 @@ import numpy as np
 char_model_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), r'../char_recognise/out_vgg_bn/model/model.th')
 
 
+device = torch.device("cuda:1")
+
 #######################################################################
 #  SDNet
 #######################################################################
@@ -65,7 +67,7 @@ class SDNet(nn.Module):
         d_grid = np.round(np.dot(grid_base, map)).astype(int)
         d_grid = np.clip(d_grid[:, ], 0, 255).reshape((1, 256, 256, 2)).transpose((0, 3, 1, 2 )).astype(float)
         d_grid = d_grid / 127.5 - 1
-        return torch.from_numpy(d_grid).float().cuda()
+        return torch.from_numpy(d_grid).float().to(device)
 
     def get_linear_estimation(self, reference_single_stroke, grids, reference_single_stroke_centroid, inverse=False):
         '''
@@ -77,7 +79,7 @@ class SDNet(nn.Module):
         '''
         grid_ = torch.transpose(grids, 2, 3)
         grid_ = torch.transpose(grid_, 1, 2)
-        mark = (reference_single_stroke > 0.5).float().cuda()  # （N, 1, 256, 256)
+        mark = (reference_single_stroke > 0.5).float().to(device)  # （N, 1, 256, 256)
 
         # Mean value of local marked region
         mean_xy = torch.sum(mark * grid_, dim=[2, 3], keepdim=True) / (
@@ -86,18 +88,18 @@ class SDNet(nn.Module):
         # Centroid of single reference stroke image
         # X-Px; Y-Py
         center_refer = torch.reshape(reference_single_stroke_centroid, (-1, 2, 1, 1))
-        grid = torch.from_numpy(self.coordinate).cuda().float().unsqueeze(0)
+        grid = torch.from_numpy(self.coordinate).to(device).float().unsqueeze(0)
         grid = grid.repeat(center_refer.size(0), 1, 1, 1)
         center = center_refer
         grid -= center  # (N,2,256,256)
 
         # Mean value of the first derivative
-        x_drive = torch.zeros(size=(1, 1, 1, 5)).float().cuda()
+        x_drive = torch.zeros(size=(1, 1, 1, 5)).float().to(device)
         x_drive[0, 0, 0, 0] = -1
         x_drive[0, 0, 0, 4] = 1
         x_drive /= 4
         x_drive = x_drive.repeat((2, 1, 1, 1))
-        y_drive = torch.zeros(size=(1, 1, 5, 1)).float().cuda()
+        y_drive = torch.zeros(size=(1, 1, 5, 1)).float().to(device)
         y_drive[0, 0, 0, 0] = -1
         y_drive[0, 0, 4, 0] = 1
         y_drive /= 4

@@ -25,7 +25,7 @@ Introduce:
 #   SDNet输入所需要的数据处理类
 ###################################################
 
-device = torch.device("cuda")
+device = torch.device("cuda:1")
 
 def apply_stroke(image, mask, color, t=False):
     """Apply the given mask to the image.

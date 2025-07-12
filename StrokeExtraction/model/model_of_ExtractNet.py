@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 
 import numpy as np
 
+device = torch.device("cuda:1")
 
 class ExtractNet(nn.Module):
     '''

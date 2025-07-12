@@ -15,6 +15,7 @@ from torchvision.transforms import Resize
 from utils import random_colors, apply_stroke_t, save_picture, seg_colors, apply_stroke, seg_label_to7
 from utils_loss_val import get_iou_without_matching, get_iou_with_matching
 
+device = torch.device("cuda:1")
 
 class DataPool(object):
     '''
@@ -132,7 +133,7 @@ class TrainExtractNet():
 
         # Extract
         self.extract_net = ExtractNet()
-        self.extract_net.cuda()
+        self.extract_net.to(device)
 
         # Data Pool
         self.data_pool = DataPool()
@@ -149,7 +150,7 @@ class TrainExtractNet():
         seg_model_path = os.path.join(self.segNet_save_path, 'model', 'model.pth')
         state = torch.load(seg_model_path)
         self.seg_net.load_state_dict(state['net'])
-        self.seg_net.to('cuda').eval().requires_grad_(False)
+        self.seg_net.to(device).eval().requires_grad_(False)
 
         # dataset
         train_loader = data.DataLoader(SegNetExtractNetLoader(is_training=True, dataset_path=dataset, is_single=True), batch_size=1, shuffle=True)
@@ -248,7 +249,7 @@ class TrainExtractNet():
 
     def __create_color_image(self, image, id):
         image = image.repeat(1, 3, 1, 1)
-        color = torch.from_numpy(np.array(seg_colors[id]).reshape(1, 3, 1, 1)).cuda()
+        color = torch.from_numpy(np.array(seg_colors[id]).reshape(1, 3, 1, 1)).to(device)
         return image * color
 
     def __get_training_data_of_ExtarctNet(self, reference_transformed_single, target_single_stroke, seg_index,
@@ -348,12 +349,12 @@ class TrainExtractNet():
 
         for i, batch_sample in enumerate(train_loader):
             # get data
-            reference_color = batch_sample['reference_color'].float().cuda()
-            reference_segment_transformation_data = batch_sample['reference_segment_transformation_data'].float().cuda()
-            target_data = batch_sample['target_data'].float().cuda()
-            target_single_stroke = batch_sample['target_single_stroke'].float().cuda()
-            reference_transformed_single = batch_sample['reference_transformed_single'].float().cuda()
-            seg_index = batch_sample['seg_id'][0].long().cuda()
+            reference_color = batch_sample['reference_color'].float().to(device)
+            reference_segment_transformation_data = batch_sample['reference_segment_transformation_data'].float().to(device)
+            target_data = batch_sample['target_data'].float().to(device)
+            target_single_stroke = batch_sample['target_single_stroke'].float().to(device)
+            reference_transformed_single = batch_sample['reference_transformed_single'].float().to(device)
+            seg_index = batch_sample['seg_id'][0].long().to(device)
 
             # get segment result fo SegNet
             seg_out, seg_out_feature = self.seg_net(target_data, reference_color)
@@ -415,12 +416,12 @@ class TrainExtractNet():
 
         for i, batch_sample in enumerate(test_loader):
             # get data
-            reference_color = batch_sample['reference_color'].float().cuda()
-            reference_segment_transformation_data = batch_sample['reference_segment_transformation_data'].float().cuda()
-            target_data_o = batch_sample['target_data'].float().cuda()
-            target_single_stroke = batch_sample['target_single_stroke'].float().cuda()
-            reference_transformed_single = batch_sample['reference_transformed_single'].float().cuda()
-            seg_index = batch_sample['seg_id'][0].long().cuda()
+            reference_color = batch_sample['reference_color'].float().to(device)
+            reference_segment_transformation_data = batch_sample['reference_segment_transformation_data'].float().to(device)
+            target_data_o = batch_sample['target_data'].float().to(device)
+            target_single_stroke = batch_sample['target_single_stroke'].float().to(device)
+            reference_transformed_single = batch_sample['reference_transformed_single'].float().to(device)
+            seg_index = batch_sample['seg_id'][0].long().to(device)
 
             # get segment result fo SegNet
             seg_out, seg_out_feature = self.seg_net(target_data_o, reference_color)

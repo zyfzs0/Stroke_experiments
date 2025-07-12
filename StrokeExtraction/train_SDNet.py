@@ -13,6 +13,7 @@ os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 import numpy as np
 import matplotlib.pyplot as plt
 
+device = torch.device("cuda:1")
 
 class TrainSDNet():
     '''
@@ -37,10 +38,10 @@ class TrainSDNet():
         self.dataset = os.path.join(os.path.dirname(os.path.abspath(__file__)), r'dataset', dataset)
 
         # ContentLoss
-        self.content_loss = ContentLoss().cuda()
+        self.content_loss = ContentLoss().to(device)
         # Net
         self.sd_net = SDNet()
-        self.sd_net.cuda()
+        self.sd_net.to(device)
 
     def save_model_parameter(self, epoch):
         # save models
@@ -103,7 +104,7 @@ class TrainSDNet():
         calculate local linear estimation transformation and transformed single target stroke.
         And, calculate content loss between transformed single target stroke and reference single stroke.
         '''
-        content_loss = torch.Tensor([0]).float().cuda()
+        content_loss = torch.Tensor([0]).float().to(device)
 
         linear_tran_batch = []
         for i in range(self.batch_size):
@@ -165,12 +166,12 @@ class TrainSDNet():
                 print('Batch size error!')
                 continue
             # get data
-            target_single_stroke = batch_sample['target_single_stroke'].cuda().float()
-            reference_single_stroke = batch_sample['reference_single_stroke'].cuda().float()
-            target_data = batch_sample['target_data'].cuda().float()
-            reference_color = batch_sample['reference_color'].cuda().float()
-            stroke_num = batch_sample['stroke_num'].cuda().float()
-            reference_single_stroke_centroid = batch_sample['reference_single_stroke_centroid'].cuda().float()
+            target_single_stroke = batch_sample['target_single_stroke'].to(device).float()
+            reference_single_stroke = batch_sample['reference_single_stroke'].to(device).float()
+            target_data = batch_sample['target_data'].to(device).float()
+            reference_color = batch_sample['reference_color'].to(device).float()
+            stroke_num = batch_sample['stroke_num'].to(device).float()
+            reference_single_stroke_centroid = batch_sample['reference_single_stroke_centroid'].to(device).float()
             reference_image = torch.clip(torch.sum(reference_single_stroke, dim=1, keepdim=True), 0, 1)
 
             transformed_target_data, flow_global, grid_for_linear = self.sd_net.get_two_registration_field(reference_color, target_data)
@@ -230,12 +231,12 @@ class TrainSDNet():
                 print('Batch size error!')
                 continue
             # get data
-            target_single_stroke = batch_sample['target_single_stroke'].cuda().float()
-            reference_single_stroke = batch_sample['reference_single_stroke'].cuda().float()
-            target_data = batch_sample['target_data'].cuda().float()
-            reference_color = batch_sample['reference_color'].cuda().float()
-            stroke_num = batch_sample['stroke_num'].cuda().float()
-            reference_single_stroke_centroid = batch_sample['reference_single_stroke_centroid'].cuda().float()
+            target_single_stroke = batch_sample['target_single_stroke'].to(device).float()
+            reference_single_stroke = batch_sample['reference_single_stroke'].to(device).float()
+            target_data = batch_sample['target_data'].to(device).float()
+            reference_color = batch_sample['reference_color'].to(device).float()
+            stroke_num = batch_sample['stroke_num'].to(device).float()
+            reference_single_stroke_centroid = batch_sample['reference_single_stroke_centroid'].to(device).float()
             reference_image = torch.clip(torch.sum(reference_single_stroke, dim=1, keepdim=True), 0, 1)
 
             transformed_target_data, flow_global, grid_for_linear = self.sd_net.get_two_registration_field(reference_color, target_data)
@@ -294,14 +295,14 @@ class TrainSDNet():
                 r2 = len(seg_colors)-1
             color_kaiti = apply_stroke(color_kaiti, single_image[r1], seg_colors[r2])
         color_kaiti = np.transpose(color_kaiti, [2, 0, 1])
-        return torch.from_numpy(color_kaiti).float().cuda().unsqueeze(0)
+        return torch.from_numpy(color_kaiti).float().to(device).unsqueeze(0)
 
     def __save_data(self, save_path, save_num, transformed_reference_color, target_data,
                     transformed_reference_single_stroke, target_single_stroke, stroke_label):
         '''
         save prior information and other data for training SegNet and ExtractNet
         '''
-        style_image_save = torch.zeros(size=(33, 256, 256)).cuda().float()
+        style_image_save = torch.zeros(size=(33, 256, 256)).to(device).float()
         tran_kaiti_color_save = transformed_reference_color[0].detach().to('cpu').numpy()
         style_original_image_save = target_data[0]
         save_data = torch.cat([style_original_image_save, style_image_save], dim=0).detach().to(
@@ -348,13 +349,13 @@ class TrainSDNet():
                 print('Batch size error!')
                 continue
             # get data
-            target_single_stroke = batch_sample['target_single_stroke'].cuda().float()
-            reference_single_stroke = batch_sample['reference_single_stroke'].cuda().float()
-            target_data = batch_sample['target_data'].cuda().float()
-            reference_color = batch_sample['reference_color'].cuda().float()
-            stroke_num = batch_sample['stroke_num'].cuda().float()
-            reference_single_stroke_centroid = batch_sample['reference_single_stroke_centroid'].cuda().float()
-            stroke_label = batch_sample['stroke_label'].cuda().long()
+            target_single_stroke = batch_sample['target_single_stroke'].to(device).float()
+            reference_single_stroke = batch_sample['reference_single_stroke'].to(device).float()
+            target_data = batch_sample['target_data'].to(device).float()
+            reference_color = batch_sample['reference_color'].to(device).float()
+            stroke_num = batch_sample['stroke_num'].to(device).float()
+            reference_single_stroke_centroid = batch_sample['reference_single_stroke_centroid'].to(device).float()
+            stroke_label = batch_sample['stroke_label'].to(device).long()
 
             transformed_target_data, flow_global, grid_for_linear = self.sd_net.get_two_registration_field(
                 reference_color, target_data)
@@ -390,13 +391,13 @@ class TrainSDNet():
                 print('Batch size error!')
                 continue
             # get data
-            target_single_stroke = batch_sample['target_single_stroke'].cuda().float()
-            reference_single_stroke = batch_sample['reference_single_stroke'].cuda().float()
-            target_data = batch_sample['target_data'].cuda().float()
-            reference_color = batch_sample['reference_color'].cuda().float()
-            stroke_num = batch_sample['stroke_num'].cuda().float()
-            reference_single_stroke_centroid = batch_sample['reference_single_stroke_centroid'].cuda().float()
-            stroke_label = batch_sample['stroke_label'].cuda().long()
+            target_single_stroke = batch_sample['target_single_stroke'].to(device).float()
+            reference_single_stroke = batch_sample['reference_single_stroke'].to(device).float()
+            target_data = batch_sample['target_data'].to(device).float()
+            reference_color = batch_sample['reference_color'].to(device).float()
+            stroke_num = batch_sample['stroke_num'].to(device).float()
+            reference_single_stroke_centroid = batch_sample['reference_single_stroke_centroid'].to(device).float()
+            stroke_label = batch_sample['stroke_label'].to(device).long()
 
             transformed_target_data, flow_global, grid_for_linear = self.sd_net.get_two_registration_field(
                 reference_color, target_data)

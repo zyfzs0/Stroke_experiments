@@ -14,7 +14,7 @@ class MainTrain():
 
     def train(self):
         # train SDNet
-        self.train_sdnet.train_model(epochs=1, init_learning_rate=0.0001, batch_size=4)
+        self.train_sdnet.train_model(epochs=20, init_learning_rate=0.0001, batch_size=4)
         print('SDNet training has been completed')
         # get prior information and other data for SegNet and ExtractNet
         self.train_sdnet.calculate_prior_information_and_qualitative(save_path='dataset_forSegNet_ExtractNet_'+self.dataset)

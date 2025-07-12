@@ -3,6 +3,7 @@ import torch
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
 
+device = torch.device("cuda:1")
 
 class SegNet(nn.Module):
     '''
