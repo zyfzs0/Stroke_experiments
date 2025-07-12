@@ -275,7 +275,7 @@ class SDNetLoader(data.Dataset):
             centroids.append(centroid)
             stroke_orders.append(row['stroke'] - 1)  # 转为0-based
             targets.append(row['target'])
-            stroke_labels.append(row['stroke'])  # 真实笔画编号（1-based）
+            stroke_labels.append(row['stroke']-1)  # 真实笔画编号（1-based）
         
         # 将所有笔画堆叠成一个张量
         strokes_tensor = torch.cat(strokes,dim=0)

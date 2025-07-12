@@ -286,7 +286,10 @@ class TrainSDNet():
             r1 =i
             if r1>=len(single_image):
                 r1 =len(single_image) -1
-            r2  = stroke_label[i]
+            if r1 >= len(stroke_label):
+                r2  = stroke_label[len(stroke_label)-1]
+            else:
+                r2  = stroke_label[r1]
             if r2>=len(seg_colors):
                 r2 = len(seg_colors)-1
             color_kaiti = apply_stroke(color_kaiti, single_image[r1], seg_colors[r2])
