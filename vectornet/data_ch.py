@@ -211,6 +211,207 @@ class BatchManager(object):
 
         return s, num_paths, path_list
 
+
+
+
+class BatchManager_new(object):
+    def __init__(self, config):
+        self.config = config
+        self.root = config.data_path
+        self.rng = np.random.RandomState(config.random_seed)
+
+        # 初始化数据路径
+        if config.is_training:
+            self.character_dir = os.path.join(self.root, 'train', 'characters')
+            self.stroke_dir = os.path.join(self.root, 'train', 'strokes')
+        else:
+            self.character_dir = os.path.join(self.root, 'test', 'characters')
+            self.stroke_dir = os.path.join(self.root, 'test', 'strokes')
+
+        # 加载数据路径
+        self.character_paths = sorted(glob(os.path.join(self.character_dir, '*.jpg')))
+        self.stroke_paths = sorted(glob(os.path.join(self.stroke_dir, '*.jpg')))
+        assert len(self.character_paths) > 0 and len(self.stroke_paths) > 0
+
+        # 检查数据是否匹配
+        self._validate_data_pairs()
+
+        self.batch_size = config.batch_size
+        self.height = config.height
+        self.width = config.width
+        self.is_pathnet = (config.archi == 'path')
+
+        # 定义数据维度
+        if self.is_pathnet:
+            feature_dim = [self.height, self.width, 2]
+            label_dim = [self.height, self.width, 1]
+        else:
+            feature_dim = [self.height, self.width, 1]
+            label_dim = [self.height, self.width, 1]
+
+        # 初始化TensorFlow队列
+        self.capacity = 10000
+        self.q = tf.FIFOQueue(self.capacity, [tf.float32, tf.float32], [feature_dim, label_dim])
+        self.x = tf.placeholder(dtype=tf.float32, shape=feature_dim)
+        self.y = tf.placeholder(dtype=tf.float32, shape=label_dim)
+        self.enqueue = self.q.enqueue([self.x, self.y])
+        self.num_threads = config.num_worker
+
+        # 数据转换
+        self.character_transform = transforms.Compose([
+            transforms.Resize((self.height, self.width)),
+            transforms.ToTensor(),
+            transforms.Lambda(lambda x: x * 255.0)
+        ])
+        self.stroke_transform = transforms.Compose([
+            transforms.Resize((self.height, self.width)),
+            transforms.ToTensor(),
+            transforms.Lambda(lambda x: x * 255.0)
+        ])
+
+    def _validate_data_pairs(self):
+        """验证字符和笔画图像是否匹配"""
+        valid_pairs = []
+        for char_path in self.character_paths:
+            base_name = os.path.splitext(os.path.basename(char_path))[0]
+            stroke_path = os.path.join(self.stroke_dir, f"{base_name}.jpg")
+            if os.path.exists(stroke_path):
+                valid_pairs.append((char_path, stroke_path))
+        
+        assert len(valid_pairs) > 0, "No valid character-stroke pairs found!"
+        self.character_paths, self.stroke_paths = zip(*valid_pairs)
+
+    def _load_images(self, char_path, stroke_path):
+        """加载字符和笔画图像"""
+        char_img = Image.open(char_path).convert('L')
+        stroke_img = Image.open(stroke_path).convert('L')
+        
+        # 应用转换
+        char_img = self.character_transform(char_img).numpy()[0]  # (H, W)
+        stroke_img = self.stroke_transform(stroke_img).numpy()[0]  # (H, W)
+        
+        return char_img, stroke_img
+
+    def preprocess_data(self, char_path, stroke_path):
+        """预处理数据"""
+        char_img, stroke_img = self._load_images(char_path, stroke_path)
+        
+        # 归一化
+        char_img = char_img / 255.0
+        stroke_img = stroke_img / 255.0
+
+        if self.is_pathnet:
+            # pathnet模式：输入是2通道（字符+笔画）
+            x = np.zeros((self.height, self.width, 2), dtype=np.float32)
+            x[:, :, 0] = char_img
+            x[:, :, 1] = stroke_img
+            y = np.expand_dims(stroke_img, axis=-1)
+        else:
+            # overlap模式：输入是单通道字符
+            x = np.expand_dims(char_img, axis=-1)
+            y = np.expand_dims(stroke_img, axis=-1)
+        
+        return x, y
+
+    def start_thread(self, sess):
+        """启动数据加载线程"""
+        print('%s: start to enque with %d threads' % (datetime.now(), self.num_threads))
+        
+        self.sess = sess
+        self.coord = tf.train.Coordinator()
+
+        def load_n_enqueue(sess, enqueue, coord, char_paths, stroke_paths, rng,
+                         x, y, w, h, is_pathnet):
+            with coord.stop_on_exception():                
+                while not coord.should_stop():
+                    idx = rng.randint(len(char_paths))
+                    x_, y_ = self.preprocess_data(char_paths[idx], stroke_paths[idx])
+                    sess.run(enqueue, feed_dict={x: x_, y: y_})
+
+        self.threads = [threading.Thread(
+            target=load_n_enqueue,
+            args=(self.sess, self.enqueue, self.coord,
+                  self.character_paths, self.stroke_paths, self.rng,
+                  self.x, self.y, self.width, self.height, self.is_pathnet)
+        ) for _ in range(self.num_threads)]
+
+        # 信号处理
+        def signal_handler(signum, frame):
+            print('%s: canceled by SIGINT' % datetime.now())
+            self.coord.request_stop()
+            self.sess.run(self.q.close(cancel_pending_enqueues=True))
+            self.coord.join(self.threads)
+            sys.exit(1)
+        signal.signal(signal.SIGINT, signal_handler)
+
+        for t in self.threads:
+            t.start()
+
+        # 等待队列填充
+        g = tf.get_default_graph()
+        g._finalized = False
+        qs = 0
+        while qs < (self.capacity*0.8):
+            qs = self.sess.run(self.q.size())
+        print('%s: q size %d' % (datetime.now(), qs))
+
+    def stop_thread(self):
+        """停止数据加载线程"""
+        g = tf.get_default_graph()
+        g._finalized = False
+
+        if hasattr(self, 'coord'):
+            self.coord.request_stop()
+            self.sess.run(self.q.close(cancel_pending_enqueues=True))
+            self.coord.join(self.threads)
+
+    def test_batch(self):
+        """生成测试数据"""
+        x_list, y_list = [], []
+        for char_path, stroke_path in zip(self.character_paths, self.stroke_paths):
+            x_, y_ = self.preprocess_data(char_path, stroke_path)
+            x_list.append(x_)
+            y_list.append(y_)
+            if len(x_list) == self.batch_size:
+                yield np.array(x_list), np.array(y_list)
+                x_list, y_list = []
+
+    def batch(self):
+        """获取一个batch的数据"""
+        return self.q.dequeue_many(self.batch_size)
+
+    def sample(self, num):
+        """随机采样num个样本"""
+        idx = self.rng.choice(len(self.character_paths), num).tolist()
+        return [(self.character_paths[i], self.stroke_paths[i]) for i in idx]
+
+    def random_list(self, num):
+        """随机采样并返回处理后的数据"""
+        x_list = []
+        xs, ys = [], []
+        file_pairs = self.sample(num)
+        
+        for char_path, stroke_path in file_pairs:
+            x, y = self.preprocess_data(char_path, stroke_path)
+            x_list.append(x)
+
+            if self.is_pathnet:
+                b_ch = np.zeros([self.height, self.width, 1])
+                xs.append(np.concatenate((x*255, b_ch), axis=-1))
+            else:
+                xs.append(x*255)
+            ys.append(y*255)
+            
+        return np.array(x_list), np.array(xs), np.array(ys), file_pairs
+
+    def __del__(self):
+        try:
+            self.stop_thread()
+        except AttributeError:
+            pass
+
+
+
 def preprocess_path(file_path, w, h, rng):
     with open(file_path, 'r') as f:
         svg = f.read()

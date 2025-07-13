@@ -147,5 +147,21 @@ class DatasetInfo(object):
             'anno_dir': 'D:/StrokeExtraction-master/dataset/RHSEDB/annotations/test.json',
             'split': 'test'
         },
+        'My_train_metadata': {
+            'name': 'train_metadata',
+            ##图像路径
+            'image_dir': 'F:',
+            ##标注文件路径
+            'anno_dir': 'D:',
+            'split': 'train'
+        },
+        'My_test_metadata': {
+            'name': 'train_metadata',
+            ##图像路径
+            'image_dir': 'F:',
+            ##标注文件路径
+            'anno_dir': 'D:',
+            'split': 'test'
+        },
     }
 
