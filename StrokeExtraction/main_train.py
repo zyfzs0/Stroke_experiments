@@ -20,10 +20,10 @@ class MainTrain():
         self.train_sdnet.calculate_prior_information_and_qualitative(save_path='dataset_forSegNet_ExtractNet_'+self.dataset)
         print('calculating prior information has been completed')
         # train SegNet
-        self.train_segnet.train_model(epochs=10, init_learning_rate=0.0001, batch_size=4, dataset_path='dataset_forSegNet_ExtractNet_'+self.dataset)
+        self.train_segnet.train_model(epochs=20, init_learning_rate=0.0001, batch_size=4, dataset_path='dataset_forSegNet_ExtractNet_'+self.dataset)
         print('SegNet training has been completed')
         #train ExtractNet
-        self.train_extractnet.train_model(epochs=20, init_learning_rate=0.0001, batch_size=4, dataset='dataset_forSegNet_ExtractNet_'+self.dataset)
+        self.train_extractnet.train_model(epochs=40, init_learning_rate=0.0001, batch_size=4, dataset='dataset_forSegNet_ExtractNet_'+self.dataset)
         print('ExtractNet training has been completed')
 
 

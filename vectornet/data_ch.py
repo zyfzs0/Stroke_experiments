@@ -14,6 +14,14 @@ from PIL import Image
 import io
 import xml.etree.ElementTree as et
 import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
+import numpy as np
+from PIL import Image
+from torch.utils.data import Dataset, DataLoader
+from torchvision import transforms
+import pandas as pd
+import torch
+import cv2
 
 from ops import *
 
@@ -219,28 +227,28 @@ class BatchManager_new(object):
         self.config = config
         self.root = config.data_path
         self.rng = np.random.RandomState(config.random_seed)
-
-        # 初始化数据路径
+        
+        # 加载CSV文件
         if config.is_training:
-            self.character_dir = os.path.join(self.root, 'train', 'characters')
-            self.stroke_dir = os.path.join(self.root, 'train', 'strokes')
+            csv_path = '/remote-home/zhangxinyue/stroke_segmentation/split_data_by_character/train_metadata.csv'
         else:
-            self.character_dir = os.path.join(self.root, 'test', 'characters')
-            self.stroke_dir = os.path.join(self.root, 'test', 'strokes')
-
-        # 加载数据路径
-        self.character_paths = sorted(glob(os.path.join(self.character_dir, '*.jpg')))
-        self.stroke_paths = sorted(glob(os.path.join(self.stroke_dir, '*.jpg')))
-        assert len(self.character_paths) > 0 and len(self.stroke_paths) > 0
-
-        # 检查数据是否匹配
+            csv_path = '/remote-home/zhangxinyue/stroke_segmentation/split_data_by_character/test_metadata.csv'
+        
+        self.df = pd.read_csv(csv_path)
+        self.character_dir = '/remote-home/zhangxinyue/stroke_segmentation/pixel_all_characters'
+        self.stroke_dir = '/remote-home/zhangxinyue/stroke_segmentation/pixel_all_strokes'
+        
+        # 初始化数据分组
+        self.grouped_df = self.df.groupby('character')
+        self.valid_characters = []
         self._validate_data_pairs()
-
+        
+        # 数据参数
         self.batch_size = config.batch_size
         self.height = config.height
         self.width = config.width
         self.is_pathnet = (config.archi == 'path')
-
+        
         # 定义数据维度
         if self.is_pathnet:
             feature_dim = [self.height, self.width, 2]
@@ -248,7 +256,7 @@ class BatchManager_new(object):
         else:
             feature_dim = [self.height, self.width, 1]
             label_dim = [self.height, self.width, 1]
-
+            
         # 初始化TensorFlow队列
         self.capacity = 10000
         self.q = tf.FIFOQueue(self.capacity, [tf.float32, tf.float32], [feature_dim, label_dim])
@@ -256,7 +264,7 @@ class BatchManager_new(object):
         self.y = tf.placeholder(dtype=tf.float32, shape=label_dim)
         self.enqueue = self.q.enqueue([self.x, self.y])
         self.num_threads = config.num_worker
-
+        
         # 数据转换
         self.character_transform = transforms.Compose([
             transforms.Resize((self.height, self.width)),
@@ -271,15 +279,27 @@ class BatchManager_new(object):
 
     def _validate_data_pairs(self):
         """验证字符和笔画图像是否匹配"""
-        valid_pairs = []
-        for char_path in self.character_paths:
-            base_name = os.path.splitext(os.path.basename(char_path))[0]
-            stroke_path = os.path.join(self.stroke_dir, f"{base_name}.jpg")
-            if os.path.exists(stroke_path):
-                valid_pairs.append((char_path, stroke_path))
+        for char_id, group in self.grouped_df:
+            valid = True
+            # 检查字符图像是否存在
+            char_path = os.path.join(self.character_dir, f"{char_id}.jpg")
+            if not os.path.exists(char_path):
+                print(f"Warning: Missing character image {char_path}")
+                valid = False
+                continue
+                
+            # 检查所有笔画图像是否存在
+            for _, row in group.iterrows():
+                stroke_path = os.path.join(self.stroke_dir, f"{row['target']}.jpg")
+                if not os.path.exists(stroke_path):
+                    print(f"Warning: Missing stroke image {stroke_path}")
+                    valid = False
+                    break
+            
+            if valid:
+                self.valid_characters.append(char_id)
         
-        assert len(valid_pairs) > 0, "No valid character-stroke pairs found!"
-        self.character_paths, self.stroke_paths = zip(*valid_pairs)
+        assert len(self.valid_characters) > 0, "No valid character-stroke pairs found!"
 
     def _load_images(self, char_path, stroke_path):
         """加载字符和笔画图像"""
@@ -320,19 +340,31 @@ class BatchManager_new(object):
         self.sess = sess
         self.coord = tf.train.Coordinator()
 
-        def load_n_enqueue(sess, enqueue, coord, char_paths, stroke_paths, rng,
-                         x, y, w, h, is_pathnet):
+        def load_n_enqueue(sess, enqueue, coord, grouped_df, valid_characters, rng,
+                         x, y, w, h, is_pathnet, character_dir, stroke_dir):
             with coord.stop_on_exception():                
                 while not coord.should_stop():
-                    idx = rng.randint(len(char_paths))
-                    x_, y_ = self.preprocess_data(char_paths[idx], stroke_paths[idx])
+                    # 随机选择一个字符
+                    char_id = rng.choice(valid_characters)
+                    group = grouped_df.get_group(char_id)
+                    
+                    # 加载字符图像
+                    char_path = os.path.join(character_dir, f"{char_id}.jpg")
+                    
+                    # 随机选择一个笔画
+                    stroke_row = group.sample(n=1).iloc[0]
+                    stroke_path = os.path.join(stroke_dir, f"{stroke_row['target']}.jpg")
+                    
+                    # 预处理并加入队列
+                    x_, y_ = self.preprocess_data(char_path, stroke_path)
                     sess.run(enqueue, feed_dict={x: x_, y: y_})
 
         self.threads = [threading.Thread(
             target=load_n_enqueue,
             args=(self.sess, self.enqueue, self.coord,
-                  self.character_paths, self.stroke_paths, self.rng,
-                  self.x, self.y, self.width, self.height, self.is_pathnet)
+                  self.grouped_df, self.valid_characters, self.rng,
+                  self.x, self.y, self.width, self.height, self.is_pathnet,
+                  self.character_dir, self.stroke_dir)
         ) for _ in range(self.num_threads)]
 
         # 信号处理
@@ -368,22 +400,36 @@ class BatchManager_new(object):
     def test_batch(self):
         """生成测试数据"""
         x_list, y_list = [], []
-        for char_path, stroke_path in zip(self.character_paths, self.stroke_paths):
-            x_, y_ = self.preprocess_data(char_path, stroke_path)
-            x_list.append(x_)
-            y_list.append(y_)
-            if len(x_list) == self.batch_size:
-                yield np.array(x_list), np.array(y_list)
-                x_list, y_list = []
+        for char_id in self.valid_characters[:100]:  # 测试前100个字符
+            group = self.grouped_df.get_group(char_id)
+            char_path = os.path.join(self.character_dir, f"{char_id}.jpg")
+            
+            for _, row in group.iterrows():
+                stroke_path = os.path.join(self.stroke_dir, f"{row['target']}.jpg")
+                x_, y_ = self.preprocess_data(char_path, stroke_path)
+                x_list.append(x_)
+                y_list.append(y_)
+                
+                if len(x_list) == self.batch_size:
+                    yield np.array(x_list), np.array(y_list)
+                    x_list, y_list = []
 
     def batch(self):
         """获取一个batch的数据"""
         return self.q.dequeue_many(self.batch_size)
 
     def sample(self, num):
-        """随机采样num个样本"""
-        idx = self.rng.choice(len(self.character_paths), num).tolist()
-        return [(self.character_paths[i], self.stroke_paths[i]) for i in idx]
+        """随机采样num个字符"""
+        char_ids = self.rng.choice(self.valid_characters, num).tolist()
+        samples = []
+        for char_id in char_ids:
+            group = self.grouped_df.get_group(char_id)
+            stroke_row = group.sample(n=1).iloc[0]
+            samples.append((
+                os.path.join(self.character_dir, f"{char_id}.jpg"),
+                os.path.join(self.stroke_dir, f"{stroke_row['target']}.jpg")
+            ))
+        return samples
 
     def random_list(self, num):
         """随机采样并返回处理后的数据"""
@@ -409,7 +455,6 @@ class BatchManager_new(object):
             self.stop_thread()
         except AttributeError:
             pass
-
 
 
 def preprocess_path(file_path, w, h, rng):
