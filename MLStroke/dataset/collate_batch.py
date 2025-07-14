@@ -1,6 +1,8 @@
 from torch.utils.data.dataloader import default_collate
 import torch
 
+#批处理
+
 
 def collate_batch(batch):
     data_input = {}

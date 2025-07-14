@@ -108,6 +108,7 @@ def removeDuplicate(output):
     ex = np.delete(ex, waitForDel, axis=0)
     output['py']=ex
     return output
+
 def run_evaluate(cfg):
     network = make_network.get_network(cfg).cuda()
     load_network(network, args.checkpoint)

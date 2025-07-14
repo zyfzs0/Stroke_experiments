@@ -147,20 +147,20 @@ class DatasetInfo(object):
             'anno_dir': 'D:/StrokeExtraction-master/dataset/RHSEDB/annotations/test.json',
             'split': 'test'
         },
-        'My_train_metadata': {
-            'name': 'train_metadata',
+        'metadata_train': {
+            'name': 'metadata',
             ##图像路径
-            'image_dir': 'F:',
+            'image_dir': '/remote-home/zhangxinyue/stroke_segmentation/pixel_all_characters',
             ##标注文件路径
-            'anno_dir': 'D:',
+            'anno_dir': '/remote-home/zhangxinyue/stroke_segmentation/split_data_by_character/train_metadata.csv',
             'split': 'train'
         },
-        'My_test_metadata': {
-            'name': 'train_metadata',
+        'metadata_test': {
+            'name': 'metadata',
             ##图像路径
-            'image_dir': 'F:',
+            'image_dir': '/remote-home/zhangxinyue/stroke_segmentation/pixel_all_characters',
             ##标注文件路径
-            'anno_dir': 'D:',
+            'anno_dir': '/remote-home/zhangxinyue/stroke_segmentation/split_data_by_character/test_metadata.csv',
             'split': 'test'
         },
     }

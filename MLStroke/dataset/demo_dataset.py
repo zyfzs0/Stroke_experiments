@@ -8,11 +8,12 @@ import torch.utils.data as data
 class Dataset(data.Dataset):
     def __init__(self, data_root, cfg):
         super(Dataset, self).__init__()
-        self.data_root = data_root
+        self.data_root = data_root    ##图片根目录
         self.split = 'test'
-        self.cfg = cfg
+        self.cfg = cfg                ##配置信息
         self.image_names, self.paths = self.process_info(data_root)
 
+    ##遍历图像文件，将其添加到image_name文件列表中###可用
     def process_info(self, data_root):
         image_name = []
         for i in os.listdir(data_root):
@@ -25,6 +26,7 @@ class Dataset(data.Dataset):
         return img
 
     def __getitem__(self, index):
+        #获取图像名称、路径
         img_name, img_path = self.image_names[index], self.paths[index]
 
         img = self.read_original_data(img_path)

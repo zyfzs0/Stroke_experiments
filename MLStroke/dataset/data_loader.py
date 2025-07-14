@@ -3,19 +3,24 @@ import torch.utils.data
 from .collate_batch import collate_batch
 from .info import DatasetInfo
 
+#根据数据集名称、测试还是训练等信息选择合适的数据集并创建数据集实例
 def make_dataset(dataset_name, is_test, cfg):
     info = DatasetInfo.dataset_info[dataset_name]
     if is_test:
-        from .test import coco, cityscapes, cityscapesCoco, sbd, kitti,csscd,ccse,RHSEDB
+        from .test import coco, cityscapes, cityscapesCoco, sbd, kitti,csscd,ccse,RHSEDB,matedata
         dataset_dict = {'coco': coco.CocoTestDataset, 'cityscapes': cityscapes.Dataset,
                         'cityscapesCoco': cityscapesCoco.CityscapesCocoTestDataset,
-                        'kitti': kitti.KittiTestDataset, 'sbd': sbd.SbdTestDataset,'csscd':csscd.CSSCDTestDataset,'ccse':ccse.CCSETestDataset,'RHSEDB':RHSEDB.RHSEDBDataset}
+                        'kitti': kitti.KittiTestDataset, 'sbd': sbd.SbdTestDataset,
+                        'csscd':csscd.CSSCDTestDataset,'ccse':ccse.CCSETestDataset,
+                        'RHSEDB':RHSEDB.RHSEDBDataset,'matedata':matedata.MateDataTestDataset}
         dataset = dataset_dict[info['name']]
     else:
-        from .train import coco, cityscapes, cityscapesCoco, sbd, kitti, csscd,ccse,RHSEDB
+        from .train import coco, cityscapes, cityscapesCoco, sbd, kitti, csscd,ccse,RHSEDB,matedata
         dataset_dict = {'coco': coco.CocoDataset, 'cityscapes': cityscapes.Dataset,
                         'cityscapesCoco': cityscapesCoco.CityscapesCocoDataset,
-                        'kitti': kitti.KittiDataset, 'sbd': sbd.SbdDataset,'csscd':csscd.CSSCDDataset,'ccse':ccse.CCSEDataset,'RHSEDB':RHSEDB.RHSEDBDataset}
+                        'kitti': kitti.KittiDataset, 'sbd': sbd.SbdDataset,
+                        'csscd':csscd.CSSCDDataset,'ccse':ccse.CCSEDataset,
+                        'RHSEDB':RHSEDB.RHSEDBDataset,'matedata':matedata.MateDataDataset}
         dataset = dataset_dict[info['name']]
     dataset = dataset(info['anno_dir'], info['image_dir'], info['split'], cfg)
     return dataset
