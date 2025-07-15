@@ -185,12 +185,6 @@ class SegNetExtractNetLoader(data.Dataset):
         # self.path = sorted(self.path, key=lambda x: x[-1])
         # print("number of dataset：%d"%len(self.path))
 
-    def get_seg_image(self, reference_single, seg_label):
-        reference_image = np.zeros(shape=(7, 256, 256), dtype=float)
-        for i in range(seg_label.shape[0]):
-            id_7 = seg_label_to7(seg_label[i])
-            reference_image[id_7] += reference_single[i]
-        return np.clip(reference_image, 0, 1)
     
     def _get_character_path(self, idx: str) -> str:
         """构建汉字图片路径"""

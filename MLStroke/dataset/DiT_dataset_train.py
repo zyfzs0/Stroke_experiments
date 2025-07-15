@@ -93,3 +93,25 @@ class CharacterStrokePairDatasetTrain(Dataset):
 
             # 'target': self.df.iloc[real_idx]['target']
         }
+
+    def __getitem__(self, index):
+        #获取图像名称、路径
+        img_name, img_path = self.image_names[index], self.paths[index]
+
+        img = self.read_original_data(img_path)
+
+        orig_img, inp, trans_input, trans_output, flipped, center, scale, inp_out_hw = \
+            augment(
+                img, self.split,
+                self.cfg.data.data_rng, self.cfg.data.eig_val, self.cfg.data.eig_vec,
+                self.cfg.data.mean, self.cfg.data.std, self.cfg.commen.down_ratio,
+                self.cfg.data.input_h, self.cfg.data.input_w, self.cfg.data.scale_range,
+                self.cfg.data.scale, self.cfg.test.test_rescale, self.cfg.data.test_scale
+            )
+
+        ret = {'inp': inp}
+
+        meta = {'center': center, 'scale': scale, 'test': '', 'img_name': img_name}
+        ret.update({'meta': meta})
+
+        return ret

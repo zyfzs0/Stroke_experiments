@@ -10,7 +10,7 @@ test.batch_size = 16
 train.epoch = 300
 train.dataset = 'ccseHW_train'
 
-test.dataset = 'ccseHW_test'
+test.dataset = ('ccseHW_val')
 
 class config(object):
     commen = commen
