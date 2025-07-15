@@ -222,6 +222,12 @@ class SegNetExtractNetLoader(data.Dataset):
         strokes_pre_path = self._get_strokes_pre_path(idx)
         return os.path.exists(strokes_pre_path)
     
+    def get_seg_image(self, reference_single, seg_label):
+            reference_image = np.zeros(shape=(33, 256, 256), dtype=float)
+            for i in range(seg_label.shape[0]):
+                id_7 = seg_label_to7(seg_label[i])
+                reference_image[id_7] += reference_single[i]
+            return np.clip(reference_image, 0, 1)
     
     def get_data(self, idx):
         """
@@ -281,9 +287,9 @@ class SegNetExtractNetLoader(data.Dataset):
         
         # 转换为固定大小 (33, 256, 256)
         max_strokes = 33
-        final_strokes_tensor = torch.zeros(max_strokes, 256, 256, dtype=strokes_tensor.dtype)
-        final_strokes_tensor[:len(strokes)] = strokes_tensor  # 填充实际笔画
-        
+        # final_strokes_tensor = torch.zeros(max_strokes, 256, 256, dtype=strokes_tensor.dtype)
+        # final_strokes_tensor[:len(strokes)] = strokes_tensor  # 填充实际笔画
+        final_strokes_tensor = strokes_tensor
         # reference_color = np.load(self.path[item][0])  # (3, 256, 256)
         # label_seg = np.load(self.path[item][1])[1:]  # (7, 256, 256)
         # target_image = np.load(self.path[item][1])[:1]  # (1, 256, 256)
@@ -296,12 +302,15 @@ class SegNetExtractNetLoader(data.Dataset):
 
         # print(ref_img.shape,stroke_labels_tensor.shape,strokes_tensor.shape,stroke_labels)
 
+        
+        reference_segment_transformation_data = self.get_seg_image(final_strokes_tensor, stroke_labels)
+        label_seg = self.get_seg_image(final_strokes_tensor, stroke_labels)
         if self.is_single:  # For ExtractNet
             return {
                 'target_data': ref_img,
                 'reference_color':ref_img,
-                'label_seg': final_strokes_tensor,
-                'reference_segment_transformation_data':final_strokes_tensor,
+                'label_seg': label_seg,
+                'reference_segment_transformation_data':reference_segment_transformation_data,
                 'seg_id':stroke_labels,
                 'reference_transformed_single': strokes_tensor,
                 'target_single_stroke': strokes_tensor
