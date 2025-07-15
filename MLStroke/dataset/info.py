@@ -103,24 +103,25 @@ class DatasetInfo(object):
         },
         'ccseHW_train': {
             'name': 'ccse',
-            'image_dir':'/remote-home/zhangyifan/Stroke_experiments/MLStroke/data',
+            'image_dir':'/remote-home/zhangyifan/Stroke_experiments/MLStroke/data/CCSE_Kai&HW/ccseHW/train2021',
             #'image_dir': 'D:/CCSE-master/dataset/handwritten_chinese_stroke_2021/train2021',
             # 'anno_dir': ('F:/DeepStroke-master/dataset/DATA_GB6763_LTH_train.json','F:/DeepStroke-master/dataset/DATA_GB6763_FZJTJW_train.json',
             #              'F:/DeepStroke-master/dataset/DATA_GB6763_FZLBJW_train.json','F:/DeepStroke-master/dataset/DATA_GB6763_HLJ_train.json','F:/DeepStroke-master/dataset/DATA_GB6763_SS_train.json'),
-            #'anno_dir': ('D:/CCSE-master/dataset/handwritten_chinese_stroke_2021/annotations/instances_train2021.json'),
+            'anno_dir': ('/remote-home/zhangyifan/Stroke_experiments/MLStroke/data/CCSE_Kai&HW/ccseHW/annotations/instances_train2021.json'),
             'split': 'train'
         },
         'ccseHW_val': {
             'name': 'ccse',
+            'image_dir': '/remote-home/zhangyifan/Stroke_experiments/MLStroke/data/CCSE_Kai&HW/ccseHW/val2021',
             #'image_dir': 'D:/CCSE-master/dataset/handwritten_chinese_stroke_2021/val2021',
-            #'anno_dir': 'D:/CCSE-master/dataset/handwritten_chinese_stroke_2021/annotations/instances_val2021.json',
+            'anno_dir': '/remote-home/zhangyifan/Stroke_experiments/MLStroke/data/CCSE_Kai&HW/ccseHW/annotations/instances_val2021.json',
             'split': 'val'
         },
         'ccseHW_test': {
             'name': 'ccse',
-
+            'image_dir': '/remote-home/zhangyifan/Stroke_experiments/MLStroke/data/CCSE_Kai&HW/ccseHW/test2021',
             #'image_dir': 'D:/CCSE-master/dataset/handwritten_chinese_stroke_2021/test2021',
-            #'anno_dir': 'D:/CCSE-master/dataset/handwritten_chinese_stroke_2021/annotations/instances_test2021.json',
+            'anno_dir': '/remote-home/zhangyifan/Stroke_experiments/MLStroke/data/CCSE_Kai&HW/ccseHW/annotations/instances_test2021.json',
             'split': 'test'
         },
         'RHSEDB_train': {
