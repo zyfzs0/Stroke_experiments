@@ -223,11 +223,12 @@ class SegNetExtractNetLoader(data.Dataset):
         return os.path.exists(strokes_pre_path)
     
     def get_seg_image(self, reference_single, seg_label):
-            reference_image = np.zeros(shape=(33, 256, 256), dtype=float)
-            for i in range(seg_label.shape[0]):
-                id_7 = seg_label_to7(seg_label[i])
-                reference_image[id_7] += reference_single[i]
-            return np.clip(reference_image, 0, 1)
+        reference_image = np.zeros(shape=(33, 256, 256), dtype=float)
+        reference_image= torch.from_numpy(reference_image)
+        for i in range(seg_label.shape[0]):
+            id_7 = seg_label_to7(seg_label[i])
+            reference_image[id_7] += reference_single[i]
+        return np.clip(reference_image, 0, 1)
     
     def get_data(self, idx):
         """
@@ -303,8 +304,8 @@ class SegNetExtractNetLoader(data.Dataset):
         # print(ref_img.shape,stroke_labels_tensor.shape,strokes_tensor.shape,stroke_labels)
 
         
-        reference_segment_transformation_data = self.get_seg_image(final_strokes_tensor, stroke_labels)
-        label_seg = self.get_seg_image(final_strokes_tensor, stroke_labels)
+        reference_segment_transformation_data = self.get_seg_image(final_strokes_tensor, stroke_labels_tensor)
+        label_seg = self.get_seg_image(final_strokes_tensor, stroke_labels_tensor)
         if self.is_single:  # For ExtractNet
             return {
                 'target_data': ref_img,
@@ -321,7 +322,7 @@ class SegNetExtractNetLoader(data.Dataset):
 
                 'target_data':  ref_img,
                 'reference_color': ref_img,
-                'label_seg':final_strokes_tensor
+                'label_seg':label_seg
             }
 
     def __len__(self):
