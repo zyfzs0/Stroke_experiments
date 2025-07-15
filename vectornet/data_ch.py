@@ -14,19 +14,16 @@ from PIL import Image
 import io
 import xml.etree.ElementTree as et
 import matplotlib.pyplot as plt
-import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image
-from torch.utils.data import Dataset, DataLoader
-from torchvision import transforms
+
 import pandas as pd
-import torch
-import cv2
+
 
 from ops import *
 
 
-class BatchManager(object):
+class BatchManager_old(object):
     def __init__(self, config):
         self.root = config.data_path
         self.rng = np.random.RandomState(config.random_seed)
@@ -222,7 +219,7 @@ class BatchManager(object):
 
 
 
-class BatchManager_new(object):
+class BatchManager(object):
     def __init__(self, config):
         self.config = config
         self.root = config.data_path
@@ -266,16 +263,21 @@ class BatchManager_new(object):
         self.num_threads = config.num_worker
         
         # 数据转换
-        self.character_transform = transforms.Compose([
-            transforms.Resize((self.height, self.width)),
-            transforms.ToTensor(),
-            transforms.Lambda(lambda x: x * 255.0)
-        ])
-        self.stroke_transform = transforms.Compose([
-            transforms.Resize((self.height, self.width)),
-            transforms.ToTensor(),
-            transforms.Lambda(lambda x: x * 255.0)
-        ])
+        self.character_transform = lambda img: tf.image.resize(
+            tf.image.convert_image_dtype(
+                tf.io.decode_jpeg(tf.io.read_file(img), channels=1),
+                tf.float32
+            ),
+            [self.height, self.width]
+        )
+        
+        self.stroke_transform = lambda img: tf.image.resize(
+            tf.image.convert_image_dtype(
+                tf.io.decode_jpeg(tf.io.read_file(img), channels=1),
+                tf.float32
+            ),
+            [self.height, self.width]
+        )
 
     def _validate_data_pairs(self):
         """验证字符和笔画图像是否匹配"""
