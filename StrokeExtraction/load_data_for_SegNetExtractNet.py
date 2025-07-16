@@ -478,7 +478,7 @@ class SegNetExtractNetLoader_new(data.Dataset):
         
         char_id = self.valid_characters[idx]
         group = self.grouped_df.get_group(char_id)
-        
+        rd_mes = self._rd_get_char(char_id)
         # 加载汉字图片
         char_path = self._get_character_path(char_id)
         char_img0= Image.open(char_path).convert('RGB')
@@ -514,9 +514,8 @@ class SegNetExtractNetLoader_new(data.Dataset):
             data_frame = np.load(rd_mes['path'])
             reference_color_image = data_frame['reference_color_image']  # (3, 256, 256)
             reference_single_image = data_frame['reference_single_image']  # (N, 256 256)
-            n_strokes_o = strokes_tensor.shape[0]
+            n_strokes_o = len(strokes)
             n_strokes = min(n_strokes_o,rd_mes['num'])
-            strokes_tensor = strokes_tensor[:n_strokes]
             reference_single_image = reference_single_image[:n_strokes]
             # print(reference_single_image.shape,n_strokes)
             reference_color_image = torch.from_numpy(reference_color_image).float()
@@ -527,8 +526,8 @@ class SegNetExtractNetLoader_new(data.Dataset):
             n_strokes = len(strokes)
         
         # centroids_tensor = centroids_tensor[:n_strokes]
-        stroke_orders= stroke_orders_tensor[:n_strokes]
-        stroke_label= stroke_labels_tensor[:n_strokes]
+        stroke_orders= stroke_orders[:n_strokes]
+        stroke_label= stroke_labels[:n_strokes]
         # 填充到33个笔画
         max_strokes = 33
         num_strokes = n_strokes
@@ -590,7 +589,7 @@ class SegNetExtractNetLoader_new(data.Dataset):
                 'reference_color': reference_color_image,
                 'label_seg':label_seg
             }
-
+        
     def __len__(self):
         return len(self.valid_characters)
 
