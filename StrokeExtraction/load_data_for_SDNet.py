@@ -97,7 +97,7 @@ def load_dict(name):
         return pickle.load(f)
 
 
-class SDNetLoader(data.Dataset):
+class SDNetLoader_b(data.Dataset):
     def __init__(self, is_training, dataset_path, is_inference=False,
                  csv_path: str = None,
                  character_dir: str= None,
@@ -119,15 +119,15 @@ class SDNetLoader(data.Dataset):
         - stroke_transform: 笔画图片的预处理
         """
         if is_training:
-            csv_path = '/remote-home/zhangxinyue/stroke_segmentation/split_data_by_character/train_metadata.csv'
+            csv_path = '/home/tongji209/majiawei/stroke_segmentation/split_data_by_character/train_metadata.csv'
 
         else:
-            csv_path = '/remote-home/zhangxinyue/stroke_segmentation/split_data_by_character/test_metadata.csv'
+            csv_path = '/home/tongji209/majiawei/stroke_segmentation/split_data_by_character/test_metadata.csv'
         
         
         self.df = pd.read_csv(csv_path)
-        self.character_dir = '/remote-home/zhangxinyue/stroke_segmentation/pixel_all_characters'
-        self.stroke_dir = '/remote-home/zhangxinyue/stroke_segmentation/pixel_all_strokes'
+        self.character_dir = '/home/tongji209/majiawei/stroke_segmentation/pixel_all_characters'
+        self.stroke_dir = '/home/tongji209/majiawei/stroke_segmentation/pixel_all_strokes'
         self.character_suffix = character_suffix
         self.stroke_suffix = stroke_suffix
         
@@ -333,7 +333,9 @@ class SDNetLoader(data.Dataset):
         data = self.get_data(item)
         return data
 
-class SDNetLoader_new(data.Dataset):
+            
+
+class SDNetLoader(data.Dataset):
     def __init__(self, is_training, dataset_path, is_inference=False,
                  csv_path: str = None,
                  character_dir: str= None,
@@ -403,7 +405,9 @@ class SDNetLoader_new(data.Dataset):
                 print(f"Warning: Missing character image {char_path}")
                 valid = False
                 continue
-                
+            rd_mes = self._rd_get_char(char_id)
+            if not rd_mes :
+                valid = False
             # 检查所有笔画图片是否存在
             for _, row in group.iterrows():
                 stroke_path = os.path.join(
@@ -535,15 +539,25 @@ class SDNetLoader_new(data.Dataset):
         stroke_orders_tensor = torch.tensor(stroke_orders, dtype=torch.long)
         stroke_labels_tensor = torch.tensor(stroke_labels, dtype=torch.long)
         
+        
+        kaiti_ref = False
         if rd_mes:
             data_frame = np.load(rd_mes['path'])
-            reference_color_image = data_frame['reference_color_image']  # (3, 256, 256)
-            reference_single_image = data_frame['reference_single_image']  # (N, 256 256)
+            
+            if kaiti_ref:
+                reference_color_image = data_frame['reference_color_image']  # (3, 256, 256)
+                reference_single_image = data_frame['reference_single_image']  # (N, 256 256)
+            else:
+                reference_color_image = data_frame['target_image']  # (1, 256, 256
+                reference_color_image = np.repeat(reference_color_image, 3, axis=0)
+                reference_single_image = data_frame['target_single_image']  # (N, 256 256)
             n_strokes_o = strokes_tensor.shape[0]
             n_strokes = min(n_strokes_o,rd_mes['num'])
             strokes_tensor = strokes_tensor[:n_strokes]
             reference_single_image = reference_single_image[:n_strokes]
             # print(reference_single_image.shape,n_strokes)
+            reference_single_centroid = data_frame['reference_single_centroid']
+            centroids_tensor = torch.from_numpy(reference_single_centroid).float()
             reference_color_image = torch.from_numpy(reference_color_image).float()
             reference_single_image = torch.from_numpy(reference_single_image).float()
         else:
@@ -580,32 +594,40 @@ class SDNetLoader_new(data.Dataset):
             stroke_orders_tensor = stroke_orders_tensor[:max_strokes]
             stroke_labels_tensor = stroke_labels_tensor[:max_strokes]
         
-        
+        zeros_reference_single_image_tensor = torch.zeros_like(reference_single_image_tensor)
+        zeros_reference_single_image_tensor =torch.full_like(reference_single_image_tensor, fill_value=127.5)
+        zeros_centroids_tensor = torch.full_like(centroids_tensor, fill_value=127.5)
+        # delta = 63.75  
+        # random_centroids = 127.5 + (torch.rand(n, 2) * 2 * delta - delta ) # [-delta, +delta]
+
+        # 确保值在 [0, 255] 范围内
+        # random_centroids = torch.clamp(random_centroids, min=0, max=255)    
+        # zeros_centroids_tensor = torch.full_like(centroids_tensor, fill_value=127.5)
+        # zeros_centroids_tensor =random_centroids
         # print(strokes_tensor.shape,char_img.shape,ref_img.shape,centroids_tensor.shape,stroke_labels_tensor.shape)
         if not self.is_inference:
             return {
                 'target_single_stroke': strokes_tensor,
-                'reference_single_stroke': reference_single_image_tensor,
+                'reference_single_stroke':reference_single_image_tensor,
                 'target_data': char_img,
                 'reference_color': reference_color_image,
                 'stroke_num': num_strokes,
-                'reference_single_stroke_centroid': centroids_tensor,
+                'reference_single_stroke_centroid': centroids_tensor ,# zeros_centroids_tensor, #centroids_tensor,
             }
         else:
             return {
                 'target_single_stroke':strokes_tensor,
-                'reference_single_stroke': reference_single_image_tensor,
+                'reference_single_stroke':reference_single_image_tensor,
                 'target_data': char_img,
                 'reference_color': reference_color_image,
                 'stroke_num': num_strokes,
-                'reference_single_stroke_centroid': centroids_tensor,
+                'reference_single_stroke_centroid':centroids_tensor, #zeros_centroids_tensor, #centroids_tensor,
                 'stroke_label': stroke_labels_tensor,
             }
             
     def __getitem__(self, item):
         data = self.get_data(item)
         return data
-      
 
 
 if __name__ == '__main__':

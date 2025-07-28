@@ -94,7 +94,7 @@ class SegNetExtractNetLoader_old(data.Dataset):
         return data
 
 
-class SegNetExtractNetLoader(data.Dataset):
+class SegNetExtractNetLoader_b(data.Dataset):
     def __init__(self, is_training, dataset_path, is_single=False,
                  csv_path: str = None,
                  character_dir: str= None,
@@ -106,15 +106,15 @@ class SegNetExtractNetLoader(data.Dataset):
         self.is_training = is_training
         self.is_single = is_single
         if is_training:
-            csv_path = '/remote-home/zhangxinyue/stroke_segmentation/split_data_by_character/train_metadata.csv'
+            csv_path = '/home/tongji209/majiawei/stroke_segmentation/split_data_by_character/train_metadata.csv'
 
         else:
-            csv_path = '/remote-home/zhangxinyue/stroke_segmentation/split_data_by_character/test_metadata.csv'
+            csv_path = '/home/tongji209/majiawei/stroke_segmentation/split_data_by_character/test_metadata.csv'
         
         
         self.df = pd.read_csv(csv_path)
-        self.character_dir = '/remote-home/zhangxinyue/stroke_segmentation/pixel_all_characters'
-        self.stroke_dir = '/remote-home/zhangxinyue/stroke_segmentation/pixel_all_strokes'
+        self.character_dir = '/home/tongji209/majiawei/stroke_segmentation/pixel_all_characters'
+        self.stroke_dir = '/home/tongji209/majiawei/stroke_segmentation/pixel_all_strokes'
         
         self.character_suffix = character_suffix
         self.stroke_suffix = stroke_suffix
@@ -183,8 +183,7 @@ class SegNetExtractNetLoader(data.Dataset):
         #                  'color' in each]
 
         # self.path = sorted(self.path, key=lambda x: x[-1])
-        # print("number of dataset：%d"%len(self.path))
-
+        # print("number of dataset：%d"%len(self.path)
     
     def _get_character_path(self, idx: str) -> str:
         """构建汉字图片路径"""
@@ -217,11 +216,13 @@ class SegNetExtractNetLoader(data.Dataset):
         return os.path.exists(strokes_pre_path)
     
     def get_seg_image(self, reference_single, seg_label):
+        # print(reference_single.shape,seg_label.shape)
         reference_image = np.zeros(shape=(33, 256, 256), dtype=float)
         reference_image= torch.from_numpy(reference_image)
         for i in range(seg_label.shape[0]):
             id_7 = seg_label_to7(seg_label[i])
-            reference_image[id_7] += reference_single[i]
+            # print(reference_image[id_7].shape,reference_single[i].shape)
+            reference_image[id_7] = reference_image[id_7] + reference_single[i]
         return np.clip(reference_image, 0, 1)
     
     def get_data(self, idx):
@@ -299,15 +300,17 @@ class SegNetExtractNetLoader(data.Dataset):
 
         
         reference_segment_transformation_data = self.get_seg_image(final_strokes_tensor, stroke_labels_tensor)
+        zeros_tensor_reference_seg = torch.zeros_like(reference_segment_transformation_data)
+        zero_transformed_single = torch.zeros_like(strokes_tensor)
         label_seg = self.get_seg_image(final_strokes_tensor, stroke_labels_tensor)
         if self.is_single:  # For ExtractNet
             return {
                 'target_data': ref_img,
                 'reference_color':ref_img,
                 'label_seg': label_seg,
-                'reference_segment_transformation_data':reference_segment_transformation_data,
-                'seg_id':stroke_labels,
-                'reference_transformed_single': strokes_tensor,
+                'reference_segment_transformation_data':zeros_tensor_reference_seg,
+                'seg_id':stroke_labels_tensor,
+                'reference_transformed_single':zero_transformed_single,    #strokes_tensor,
                 'target_single_stroke': strokes_tensor
 
             }
@@ -327,7 +330,7 @@ class SegNetExtractNetLoader(data.Dataset):
         return data
 
 
-class SegNetExtractNetLoader_new(data.Dataset):
+class SegNetExtractNetLoader(data.Dataset):
     def __init__(self, is_training, dataset_path, is_single=False,
                  csv_path: str = None,
                  character_dir: str= None,
@@ -387,7 +390,9 @@ class SegNetExtractNetLoader_new(data.Dataset):
                 print(f"Warning: Missing character image {char_path}")
                 valid = False
                 continue
-                
+            rd_mes = self._rd_get_char(char_id)
+            if not rd_mes :
+                valid = False
             # 检查所有笔画图片是否存在
             for _, row in group.iterrows():
                 stroke_path = os.path.join(
@@ -398,7 +403,7 @@ class SegNetExtractNetLoader_new(data.Dataset):
                     print(f"Warning: Missing stroke image {stroke_path}")
                     valid = False
                     break
-            
+                    
             if valid:
                 self.valid_characters.append(char_id)
         # if is_training:
@@ -509,11 +514,16 @@ class SegNetExtractNetLoader_new(data.Dataset):
             stroke_orders.append(row['stroke'] - 1)  # 转为0-based
             targets.append(row['target'])
             stroke_labels.append(row['stroke']-1)  # 真实笔画编号（1-based）
-        
+        kaiti_ref = True
         if rd_mes:
             data_frame = np.load(rd_mes['path'])
-            reference_color_image = data_frame['reference_color_image']  # (3, 256, 256)
-            reference_single_image = data_frame['reference_single_image']  # (N, 256 256)
+            if kaiti_ref:
+                reference_color_image = data_frame['reference_color_image']  # (3, 256, 256)
+                reference_single_image = data_frame['reference_single_image']  # (N, 256 256)
+            else:
+                reference_color_image = data_frame['target_image']  # (1, 256, 256
+                reference_color_image = np.repeat(reference_color_image, 3, axis=0)
+                reference_single_image = data_frame['target_single_image']  # (N, 256 256
             n_strokes_o = len(strokes)
             n_strokes = min(n_strokes_o,rd_mes['num'])
             reference_single_image = reference_single_image[:n_strokes]
@@ -576,10 +586,11 @@ class SegNetExtractNetLoader_new(data.Dataset):
                 'target_data': ref_img,
                 'reference_color':reference_color_image,
                 'label_seg': label_seg,
-                'reference_segment_transformation_data':zeros_tensor_reference_seg,
+                'reference_segment_transformation_data': reference_segment_transformation_data,
                 'seg_id':stroke_labels_tensor,
-                'reference_transformed_single':zero_transformed_single,    #strokes_tensor,
-                'target_single_stroke': strokes_tensor
+                'reference_transformed_single': reference_single_image,    #strokes_tensor,
+                'target_single_stroke': strokes_tensor,
+                'stroke_num':num_real_strokes,
 
             }
         else:  # For SegNet
@@ -589,7 +600,7 @@ class SegNetExtractNetLoader_new(data.Dataset):
                 'reference_color': reference_color_image,
                 'label_seg':label_seg
             }
-        
+
     def __len__(self):
         return len(self.valid_characters)
 
