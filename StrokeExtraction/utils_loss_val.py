@@ -163,7 +163,7 @@ def get_iou_with_matching(out, label):
     '''
     ious = []
     for index, each in enumerate(out):
-        iou = np.sum((each + label[index]) > 1.5) / (np.sum((each + label[index]) > 0.5) + 0.00001)
+        iou = np.sum((1.0 - each + 1.0 - label[index]) > 1.5) / (np.sum((1.0 -each + 1.0 -label[index]) > 0.5) + 0.00001)
         ious.append(iou)
     return np.mean(np.array(ious))
 
@@ -174,9 +174,9 @@ def get_iou_without_matching(out, label):
     '''
     ious = []
     for index, each in enumerate(out):
-        union = [np.sum((each+x)>1.5) for x in label]
+        union = [np.sum((1.0 -each+1.0 -x)>1.5) for x in label]
         max_index = np.argmax(np.array(union))
         label_m = label[max_index]
-        iou = np.sum((each + label_m) > 1.5) / (np.sum((each + label_m) > 0.5) + 0.00001)
+        iou = np.sum((1.0 -each + 1.0 -label_m) > 1.5) / (np.sum((1.0 -each + 1.0 -label_m) > 0.5) + 0.00001)
         ious.append(iou)
     return np.mean(np.array(ious))

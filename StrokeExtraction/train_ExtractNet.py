@@ -12,7 +12,7 @@ import numpy as np
 import cv2
 import matplotlib.pyplot as plt
 from torchvision.transforms import Resize
-from utils import random_colors, apply_stroke_t, save_picture, seg_colors, apply_stroke, seg_label_to7
+from utils import random_colors, apply_stroke_t, save_picture, seg_colors, apply_stroke, seg_label_to7,seg_label_to7_o
 from utils_loss_val import get_iou_without_matching, get_iou_with_matching
 import piq
 from piq import psnr, ssim
@@ -23,7 +23,37 @@ device = torch.device("cuda:0")
 device0 = torch.device('cpu')
 loss_fn_lpips = lpips.LPIPS(net='alex').to(device0)  # 使用 AlexNet 作为 LPIPS 的特征提取器
 
-def min_max_normalize(x, target_data_o):
+
+import json
+from collections import defaultdict
+
+class TestMetricsRecorder:
+    def __init__(self):
+        self.reset()
+    
+    def reset(self):
+        self.char_metrics = defaultdict(dict)
+        self.global_metrics = {}
+    
+    def add_char_metrics(self, char_id, metrics):
+        self.char_metrics[char_id] = metrics
+
+    
+    def set_global_metrics(self, metrics):
+        self.global_metrics = metrics
+    
+    def to_dict(self):
+        return {
+            "global_metrics": self.global_metrics,
+            "char_metrics": self.char_metrics,
+        }
+    
+    def save_to_json(self, filepath):
+        with open(filepath, 'w') as f:
+            json.dump(self.to_dict(), f, indent=2)
+
+
+def min_max_normalize(x, target_data_o, save_path = "", no =0):
     """
     针对黑色有效/白色无效的target_data_o的特殊处理
     返回归一化后的(3,256,256)数组，其中：
@@ -44,19 +74,23 @@ def min_max_normalize(x, target_data_o):
     # 应用掩码：有效区域用原图，无效区域用白色
     # 注意：这里需要广播mask到3个通道
     masked = target_np * (1 - mask) + white_bg * mask
-    
+    mask_3ch = np.repeat(np.expand_dims(mask, axis=0), repeats=3, axis=0) 
     # 归一化处理
     c_min = masked.min()
     c_max = masked.max()
     normalized = (masked - c_min) / (c_max - c_min + 1e-8)
+    if save_path != "":
     # 假设 normalized 是形状为 (3,256,256) 的 numpy 数
-    # print(normalized.shape)
-    # normalized_uint8 = (normalized[0] * 255.0).clip(0, 255).astype(np.uint8) # 转换为 [0,255] 的 uint8
-
-    # # 调整通道顺序为 (256,256,3) 供 matplotlib 显示
-    # normalized_rgb = np.transpose(normalized_uint8, (1, 2, 0))
-    # normalized_bgr = cv2.cvtColor(normalized_rgb, cv2.COLOR_RGB2BGR)
-    # cv2.imwrite('./test_pic/normalized_image_cv.png', normalized_bgr)
+        # print(normalized.shape)
+        normalized_uint8 = (normalized[0] * 255.0).clip(0, 255).astype(np.uint8) # 转换为 [0,255] 的 uint8
+        mask_3ch_uint8 = (mask_3ch * 255.0).clip(0, 255).astype(np.uint8)
+        # 调整通道顺序为 (256,256,3) 供 matplotlib 显示
+        normalized_rgb = np.transpose(normalized_uint8, (1, 2, 0))
+        mask_rgb = np.transpose(mask_3ch_uint8, (1, 2, 0))
+        normalized_bgr = cv2.cvtColor(normalized_rgb, cv2.COLOR_RGB2BGR)
+        mask_bgr= cv2.cvtColor(mask_rgb, cv2.COLOR_RGB2BGR)
+        cv2.imwrite(save_path+'/_'+str(no)+'.png', normalized_bgr)
+        cv2.imwrite(save_path+'/_'+str(no)+'_mask.png', mask_bgr)
     return normalized.astype(np.float32)
 
 
@@ -121,11 +155,11 @@ def compute_iou(pred, target, eps=1e-8):
         
         iou = (intersection + eps) / (union + eps)  # [n]
         channel_ious.append(iou)
-    
+    char_iou = torch.stack(channel_ious).mean(dim=0)
     # 计算平均IoU（先对各样本取通道平均，再对batch取平均）
     mean_iou = torch.stack(channel_ious).mean(dim=0).mean()  # 先平均通道，再平均batch
     
-    return mean_iou
+    return mean_iou,char_iou.detach().cpu().numpy()
 
 
 def batch_soft_dice(y_true, y_pred):
@@ -134,8 +168,8 @@ def batch_soft_dice(y_true, y_pred):
     for b in range(B):
         yt = 1.0 - y_true[b]
         yp = 1.0 - y_pred[b]
-        losses.append(soft_dice(yt, yp))
-    return sum(losses)/B
+        losses.append(soft_dice(yt, yp).item())
+    return sum(losses)/B,losses
 
 
 
@@ -148,7 +182,7 @@ def batch_mask_dice(y_true, y_pred):
         yt = 1.0 - y_true[b]
         yp = 1.0 - y_pred[b]
         losses.append(Dice(yt, yp))
-    return sum(losses)/B
+    return sum(losses)/B,losses
 
 def compute_pixel_accuracy_batch(pred, target):
     """
@@ -157,7 +191,7 @@ def compute_pixel_accuracy_batch(pred, target):
     B = pred.shape[0]
     correct = (pred == target).float().view(B, -1).sum(dim=1)
     total = pred[0].numel()
-    return correct.sum() / (B * total)  # 标量平均值
+    return correct.sum() / (B * total),  correct/ total# 标量平均值
 
 
 def batch_normalize_to_01(x, eps=1e-8):
@@ -180,6 +214,57 @@ def batch_normalize_to_minus1_1(x: torch.Tensor, eps=1e-8):
     x_norm = x_norm * 2 - 1  # -> [-1,1]
     return x_norm.view_as(x)
 
+
+
+
+def calculate_stroke_metrics_batch(pred_masks, true_masks, iou_threshold=0.5, device="cpu"):
+    """
+    计算笔画匹配的准确率和提取率（支持 List[np.ndarray] 输入）
+    
+    参数:
+        pred_masks (list[np.ndarray]): 预测笔画列表，每个元素是 [H, W] 的布尔型数组（True=笔画）
+        true_masks (list[np.ndarray]): 真实笔画列表，每个元素是 [H, W] 的布尔型数组（True=笔画）
+        iou_threshold (float): 判定匹配成功的IoU阈值（默认0.5）
+        device (str): 计算设备（"cpu" 或 "cuda"）
+    
+    返回:
+        accuracy (float): 预测笔画的正确率
+        extract_rate (float): 真实笔画的被提取率
+        pred_correct (list[bool]): 每个预测笔画是否匹配到正确的真实笔画
+        true_extracted (list[bool]): 每个真实笔画是否被至少一个预测笔画匹配
+    """
+    # 1. 将 NumPy 数组转换为 PyTorch 张量，并反转逻辑（True -> 0.0, False -> 1.0）
+    y_pred = torch.stack([1.0 - torch.from_numpy(mask).float() for mask in pred_masks]).to(device)  # [N_pred, H, W]
+    y_true = torch.stack([1.0 - torch.from_numpy(mask).float() for mask in true_masks]).to(device)  # [N_true, H, W]
+
+    # 2. 展平张量 [N_pred, H*W] 和 [N_true, H*W]
+    y_pred_flat = y_pred.view(y_pred.size(0), -1)  # [N_pred, H*W]
+    y_true_flat = y_true.view(y_true.size(0), -1)  # [N_true, H*W]
+
+    # 3. 计算交集和并集 [N_pred, N_true]
+    intersection = torch.mm(y_pred_flat, y_true_flat.t())  # [N_pred, N_true]
+    pred_area = y_pred_flat.sum(dim=1)  # [N_pred]
+    true_area = y_true_flat.sum(dim=1)  # [N_true]
+    union = pred_area.unsqueeze(1) + true_area.unsqueeze(0) - intersection  # [N_pred, N_true]
+
+    # 4. 计算IoU矩阵 [N_pred, N_true]
+    iou_matrix = intersection / (union + 1e-8)  # 避免除零
+
+    # 5. 统计预测笔画是否正确（IoU > threshold）
+    max_iou, matched_true_idx = iou_matrix.max(dim=1)  # 每个预测笔画匹配的最佳真实笔画
+    pred_correct = (max_iou >= iou_threshold).tolist()
+    accuracy = sum(pred_correct) / max(len(pred_masks), 1)  # 避免除零
+
+    # 6. 统计真实笔画是否被提取（至少一个预测笔画的IoU > threshold）
+    if len(true_masks) > 0:
+        max_iou_true, _ = iou_matrix.max(dim=0)  # 每个真实笔画对应的最大IoU
+        true_extracted = (max_iou_true >= iou_threshold).tolist()
+        extract_rate = sum(true_extracted) / max(len(true_masks), 1)
+    else:
+        true_extracted = []
+        extract_rate = 0.0
+
+    return accuracy, extract_rate, pred_correct, true_extracted
 
 class DataPool(object):
     '''
@@ -278,6 +363,7 @@ class TrainExtractNet():
     def __init__(self,  save_path=None, segNet_save_path=None):
         super().__init__()
         self.segNet_save_path = segNet_save_path
+        self.save_json_path = save_path
         self.Out_path_train = os.path.join(save_path, 'train')
         self.Model_path = os.path.join(save_path, 'model')
         self.Out_path_loss = os.path.join(save_path, 'loss')
@@ -290,7 +376,7 @@ class TrainExtractNet():
             os.makedirs(self.Out_path_loss)
         if not os.path.exists(self.Out_path_val):
             os.makedirs(self.Out_path_val)
-
+        self.metrics_recorder = TestMetricsRecorder()
         # SegNet
         self.seg_net = SegNet(out_feature=True)
 
@@ -458,7 +544,7 @@ class TrainExtractNet():
         cut_box_list = []
         for index in range(int(seg_index.size(0))):
             id = int(seg_index[index])
-            id_7 = seg_label_to7(id)
+            id_7 = seg_label_to7_o(id)
             kaiti_single_image_trans = kaiti_tran_single_image[index:index + 1]
 
             # get cut region：
@@ -495,6 +581,7 @@ class TrainExtractNet():
             style_original_stage2_in.append(style_image_original_in)
         reference_stroke_transformation_data = torch.cat(kaiti_trans_stage2_in, dim=0)
         label = torch.cat(style_stage2_in, dim=0)
+        # print(seg_out_stage_in[5])
         segment_data = torch.cat(seg_out_stage_in, dim=0)
         segNet_feature = seg_out_feature['out_64_32'].repeat(label.size(0), 1, 1, 1)
         target_data = torch.cat(style_original_stage2_in, dim=0)
@@ -585,10 +672,10 @@ class TrainExtractNet():
                 mse = torch.nn.functional.mse_loss(extract_tensor, label_tensor)
                 psnr_value = psnr(extract_tensor, label_tensor, data_range=1.0)
                 ssim_value = ssim(extract_tensor, label_tensor, data_range=1.0)
-                iou_value = compute_iou(extract_tensor, label_tensor)
-                dice_value = batch_soft_dice(label_tensor, extract_tensor)
-                dice_mask_value = batch_mask_dice(label,extract_result)
-                accuarcy_value = compute_pixel_accuracy_batch(extract_tensor, label_tensor)
+                iou_value, iou_list = compute_iou(extract_tensor, label_tensor)
+                dice_value, dice_list = batch_soft_dice(label_tensor, extract_tensor)
+                dice_mask_value , dicem_list= batch_mask_dice(label,extract_result)
+                accuarcy_value,acc_list = compute_pixel_accuracy_batch(extract_tensor, label_tensor)
                 # LPIPS需要3通道
                 extract_rgb = extract_tensor.repeat(1, 1, 1, 1)
                 label_rgb = label_tensor.repeat(1, 1, 1, 1)
@@ -603,7 +690,7 @@ class TrainExtractNet():
 
                 # 计算 LPIPS
                 lpips_value = loss_fn_lpips(extract_rgb, label_rgb).mean()
-
+                accuracy, extract_rate, pred_correct, true_extracted = calculate_stroke_metrics_batch(extract_result, label)
                 loss.backward()
                 optim_opWhole.step()
                 optim_opWhole.zero_grad()
@@ -618,7 +705,7 @@ class TrainExtractNet():
                     ssim_value.item(), # SSIM (越大越好)
                     lpips_value.item(),# LPIPS (越小越好)
                     iou_value.item(),
-                    dice_value.item(),
+                    dice_value,
                     dice_mask_value.item(),
                     accuarcy_value.item(),
                 ])
@@ -645,6 +732,7 @@ class TrainExtractNet():
         loss_list = []
         start_time = time.time()
 
+        metrics_list = []
         for i, batch_sample in enumerate(test_loader):
             # get data
             reference_color = batch_sample['reference_color'].float().to(device)
@@ -656,7 +744,7 @@ class TrainExtractNet():
             srtrokes_num =batch_sample['stroke_num'].to(device0)
             # get segment result fo SegNet
             seg_out, seg_out_feature = self.seg_net(target_data_o, reference_color)
-
+            char_id = batch_sample ['unicode'].to(device0)
             # get inputs of ExtractNet
             target_data, reference_stroke_transformation_data, segment_data, \
             reference_segment_transformation_data, segNet_feature, label, cut_box_list = self.__get_training_data_of_ExtarctNet(
@@ -671,7 +759,9 @@ class TrainExtractNet():
             # calculate loss
             loss = F.binary_cross_entropy(F.sigmoid(extract_out), label)
             extract_result = F.sigmoid(extract_out).detach() > 0.5
-
+            val_i_path = os.path.join(self.Out_path_val, str(i))
+            if not os.path.exists(val_i_path):
+                os.makedirs(val_i_path)
             #  Restore strokes to their original size
             extract_result, label = self.__to_original_stroke(extract_result, label, cut_box_list)
             # print(extract_result[0].shape,label[0].shape) # (256,256)
@@ -679,7 +769,7 @@ class TrainExtractNet():
             mIOUm = get_iou_with_matching(extract_result, label)
             mIOUum = get_iou_without_matching(extract_result, label)
             
-            extract_result_norm = [torch.from_numpy(min_max_normalize(x,target_data_o)).float() for x in extract_result]
+            extract_result_norm = [torch.from_numpy(min_max_normalize(x,target_data_o,val_i_path,k+1)).float() for k,x in enumerate(extract_result)]
             label_norm = [torch.from_numpy(min_max_normalize(x,target_data_o)).float() for x in label]
 
             # 转换为PIQ需要的格式 (N, 1, H, W)
@@ -689,10 +779,10 @@ class TrainExtractNet():
             mse = torch.nn.functional.mse_loss(extract_tensor, label_tensor)
             psnr_value = psnr(extract_tensor, label_tensor, data_range=1.0)
             ssim_value = ssim(extract_tensor, label_tensor, data_range=1.0)
-            iou_value = compute_iou(extract_tensor, label_tensor)
-            dice_value = batch_soft_dice(label_tensor, extract_tensor)
-            dice_mask_value = batch_mask_dice(label,extract_result)
-            accuarcy_value = compute_pixel_accuracy_batch(extract_tensor, label_tensor)
+            iou_value, iou_list = compute_iou(extract_tensor, label_tensor)
+            dice_value, dice_list = batch_soft_dice(label_tensor, extract_tensor)
+            dice_mask_value , dicem_list= batch_mask_dice(label,extract_result)
+            accuarcy_value,acc_list = compute_pixel_accuracy_batch(extract_tensor, label_tensor)
             # LPIPS需要3通道
             extract_rgb = extract_tensor.repeat(1, 1, 1, 1)
             label_rgb = label_tensor.repeat(1, 1, 1, 1)
@@ -707,7 +797,7 @@ class TrainExtractNet():
 
             # 计算 LPIPS
             lpips_value = loss_fn_lpips(extract_rgb, label_rgb).mean()
-            
+            accuracy, extract_rate, pred_correct, true_extracted = calculate_stroke_metrics_batch(extract_result, label)
             torch.cuda.empty_cache()
             # 4. 将新指标添加到 loss_list
             loss_list.append([
@@ -719,10 +809,34 @@ class TrainExtractNet():
                 ssim_value.item(), # SSIM (越大越好)
                 lpips_value.item(), # LPIPS (越小越好
                 iou_value.item(),
-                dice_value.item(),
+                dice_value,
                 dice_mask_value.item(),
                 accuarcy_value.item(),
             ])
+            
+            metrics_list.append([
+                accuracy, extract_rate,
+            ])
+            
+            char_metrics = {
+                "loss": loss.item(),
+                "MSE": mse.item(),
+                "PSNR": psnr_value.item(),
+                "SSIM": ssim_value.item(),
+                "LPIPS": lpips_value.item(),
+                "IOU": iou_value.item(),
+                "iou list":iou_list.tolist(),
+                "Dice": dice_value,
+                "dice list":dice_list,
+                "Dicem": dice_mask_value.item(),
+                "dicem list": dicem_list,
+                "Accuracy": accuarcy_value.item(),
+                "stroke_accuracy": accuracy,
+                "extract_rate": extract_rate,
+                "pred correct":pred_correct,
+                "true extract":true_extracted,
+            }
+            self.metrics_recorder.add_char_metrics(str(i), char_metrics)
             if (i+1)%1==0 and (epoch+1)%1==0:
                 # save data
                 # extract_result_show = np.zeros(shape=(256, 256, 3), dtype=float) + target_data_o.squeeze().detach().to(
@@ -782,10 +896,11 @@ class TrainExtractNet():
                 save_list.append(torch.from_numpy(extract_result_show.transpose(2, 0, 1)).unsqueeze(0).repeat(2, 1, 1, 1))
 
                 save_picture(*save_list, title_list=title_list,
-                             path=os.path.join(self.Out_path_val, str(i)+str(epoch) +"-"+str(int(iou_value.item()*100.0))+'.bmp'),
+                             path=os.path.join(self.Out_path_val, str(i)+'.bmp'),
                              nrow=int(save_list[0].size(0)))
 
         loss_value = np.mean(np.array(loss_list), axis=0)
+        metrics_value = np.mean(np.array(metrics_list), axis=0)
         # 5. 打印时增加新指
         # loss_name = ['loss', 'mIOUm', 'mIOUum']
         loss_name = ['loss', 'mIOUm', 'mIOUum', 'MSE', 'PSNR', 'SSIM', 'LPIPS','IOU','Dice','Dicem','Accuracy']
@@ -798,6 +913,28 @@ class TrainExtractNet():
                 time.time() - start_time
             )
         )
+        print(
+            "[TEST other][{}/{}], accuracy={:.7f}, extract_rate={:.7f}".format(
+                i, len(test_loader), 
+                metrics_value[0], metrics_value[1],
+                
+            )
+        )
+        global_metrics = {
+        "MSE": loss_value[3],
+        "PSNR": loss_value[4],
+         "SSIM": loss_value[5],
+        "LPIPS": loss_value[6],
+         "IOU": loss_value[7],
+        "Dice": loss_value[8],
+         "Dicem": loss_value[9],
+        "Accuracy": loss_value[10],
+         "accuracy": metrics_value[0].item(),
+        "extract_rate": metrics_value[1].item(),
+        }
+        self.metrics_recorder.set_global_metrics(global_metrics)
+        self.save_json_path
+        self.metrics_recorder.save_to_json( self.save_json_path +'/test_metric.json' )
         return loss_value, loss_name
 
 
@@ -805,6 +942,6 @@ class TrainExtractNet():
 
 
 if __name__ == '__main__':
-    model = TrainExtractNet(save_path='out/03ExtractNet_ref_self', segNet_save_path='out/0SegNet_ref_self')
-    #model.train_model(epochs=20, init_learning_rate=0.0001, batch_size=4, dataset=r'dataset_forSegNet_ExtractNet2_self')
-    model.test_model(extract_save_path ='out/02ExtractNet_ref_self',dataset=r'dataset_forSegNet_ExtractNet0_self')
+    model = TrainExtractNet(save_path='out0/7_ExtractNet_vupdown_self', segNet_save_path='out0/7_SegNet_updown_self')
+    #model.train_model(epochs=20, init_learning_rate=0.0001, batch_size=4, dataset=r'dataset_forSegNet_ExtractNet7_0_self')
+    model.test_model(extract_save_path ='out0/7_ExtractNet_updown_self',dataset=r'dataset_forSegNet_ExtractNet7_updown_self')

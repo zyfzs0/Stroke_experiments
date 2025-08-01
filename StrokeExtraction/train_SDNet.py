@@ -13,7 +13,7 @@ os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 import numpy as np
 import matplotlib.pyplot as plt
 
-device = torch.device("cuda:1")
+device = torch.device("cuda:0")
 
 class TrainSDNet():
     '''
@@ -426,8 +426,8 @@ class TrainSDNet():
 
 
 if __name__ == '__main__':
-    model = TrainSDNet(save_path='out/SDNet', dataset='CCSEDB')
-    model.train_model(epochs=40, init_learning_rate=0.0001, batch_size=8)
+    model = TrainSDNet(save_path='out/SDNet_ref', dataset='CCSEDB')
+    model.train_model(epochs=20, init_learning_rate=0.0001, batch_size=8)
     model.calculate_prior_information_and_qualitative('dataset_forSegNet_ExtractNet_CCSEDB')
 
 

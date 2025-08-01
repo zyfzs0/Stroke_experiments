@@ -69,7 +69,17 @@ CategoryOfStroke_to7 = [
 ]
 
 
+CategoryOfStroke_to70 = [0,
+                         1,
+                         2,
+                         3, 3,
+                         4, 4, 5,
+                         5,  5, 5, 5, 5, 5, 5, 5,
+                         6, 6, 6, 2,
+                         4, 4, 4, 2]
 def seg_label_to7(id):
     return CategoryOfStroke_to7[id]
 
+def seg_label_to7_o(id):
+    return CategoryOfStroke_to70[id]
 

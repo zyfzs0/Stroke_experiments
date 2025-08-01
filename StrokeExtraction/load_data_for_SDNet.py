@@ -540,7 +540,7 @@ class SDNetLoader(data.Dataset):
         stroke_labels_tensor = torch.tensor(stroke_labels, dtype=torch.long)
         
         
-        kaiti_ref = False
+        kaiti_ref = True
         if rd_mes:
             data_frame = np.load(rd_mes['path'])
             
@@ -551,6 +551,8 @@ class SDNetLoader(data.Dataset):
                 reference_color_image = data_frame['target_image']  # (1, 256, 256
                 reference_color_image = np.repeat(reference_color_image, 3, axis=0)
                 reference_single_image = data_frame['target_single_image']  # (N, 256 256)
+            stroke_label = data_frame['stroke_label']
+            stroke_labels_tensor = torch.tensor(stroke_label, dtype=torch.long)
             n_strokes_o = strokes_tensor.shape[0]
             n_strokes = min(n_strokes_o,rd_mes['num'])
             strokes_tensor = strokes_tensor[:n_strokes]
@@ -600,6 +602,7 @@ class SDNetLoader(data.Dataset):
         # delta = 63.75  
         # random_centroids = 127.5 + (torch.rand(n, 2) * 2 * delta - delta ) # [-delta, +delta]
 
+
         # 确保值在 [0, 255] 范围内
         # random_centroids = torch.clamp(random_centroids, min=0, max=255)    
         # zeros_centroids_tensor = torch.full_like(centroids_tensor, fill_value=127.5)
@@ -608,20 +611,20 @@ class SDNetLoader(data.Dataset):
         if not self.is_inference:
             return {
                 'target_single_stroke': strokes_tensor,
-                'reference_single_stroke':reference_single_image_tensor,
+                'reference_single_stroke':1.0 - reference_single_image_tensor,
                 'target_data': char_img,
-                'reference_color': reference_color_image,
+                'reference_color': 1.0 - reference_color_image,
                 'stroke_num': num_strokes,
-                'reference_single_stroke_centroid': centroids_tensor ,# zeros_centroids_tensor, #centroids_tensor,
+                'reference_single_stroke_centroid': centroids_tensor,
             }
         else:
             return {
                 'target_single_stroke':strokes_tensor,
-                'reference_single_stroke':reference_single_image_tensor,
+                'reference_single_stroke':1.0 - reference_single_image_tensor,
                 'target_data': char_img,
-                'reference_color': reference_color_image,
+                'reference_color': 1.0 - reference_color_image,
                 'stroke_num': num_strokes,
-                'reference_single_stroke_centroid':centroids_tensor, #zeros_centroids_tensor, #centroids_tensor,
+                'reference_single_stroke_centroid': centroids_tensor,
                 'stroke_label': stroke_labels_tensor,
             }
             

@@ -10,7 +10,7 @@ import os.path
 import glob
 import matplotlib.pyplot as plt
 import numpy as np
-from utils import seg_label_to7
+from utils import seg_label_to7,seg_label_to7_o
 from PIL import Image
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
@@ -50,6 +50,7 @@ class SegNetExtractNetLoader_old(data.Dataset):
         reference_image = np.zeros(shape=(7, 256, 256), dtype=float)
         for i in range(seg_label.shape[0]):
             id_7 = seg_label_to7(seg_label[i])
+            # id_7 = seg_label_to7_o(seg_label[i])
             reference_image[id_7] += reference_single[i]
         return np.clip(reference_image, 0, 1)
 
@@ -406,23 +407,23 @@ class SegNetExtractNetLoader(data.Dataset):
                     
             if valid:
                 self.valid_characters.append(char_id)
-        # if is_training:
-        #     self.path = [[os.path.join(dataset_path, 'train', each),
-        #                   os.path.join(dataset_path, 'train', each[:-16] + '_style.npy'),
-        #                   os.path.join(dataset_path, 'train', each[:-16] + '_seg.npy'),
-        #                   os.path.join(dataset_path, 'train', each[:-16] + '_single.npy'),
-        #                   os.path.join(dataset_path, 'train', each[:-16] + '_style_single.npy')]
-        #                    for each in os.listdir(os.path.join(dataset_path, 'train')) if 'color' in each]
-        # else:
-        #     self.path = [[os.path.join(dataset_path, 'test', each),
-        #                   os.path.join(dataset_path, 'test', each[:-16] + '_style.npy'),
-        #                   os.path.join(dataset_path, 'test', each[:-16] + '_seg.npy'),
-        #                   os.path.join(dataset_path, 'test', each[:-16] + '_single.npy'),
-        #                   os.path.join(dataset_path, 'test', each[:-16] + '_style_single.npy'), int(each[:-16])]
-        #                    for each in os.listdir(os.path.join(dataset_path, 'test')) if
-        #                  'color' in each]
+        if is_training:
+            self.path = [[os.path.join(dataset_path, 'train', each),
+                          os.path.join(dataset_path, 'train', each[:-16] + '_style.npy'),
+                          os.path.join(dataset_path, 'train', each[:-16] + '_seg.npy'),
+                          os.path.join(dataset_path, 'train', each[:-16] + '_single.npy'),
+                          os.path.join(dataset_path, 'train', each[:-16] + '_style_single.npy')]
+                           for each in os.listdir(os.path.join(dataset_path, 'train')) if 'color' in each]
+        else:
+            self.path = [[os.path.join(dataset_path, 'test', each),
+                          os.path.join(dataset_path, 'test', each[:-16] + '_style.npy'),
+                          os.path.join(dataset_path, 'test', each[:-16] + '_seg.npy'),
+                          os.path.join(dataset_path, 'test', each[:-16] + '_single.npy'),
+                          os.path.join(dataset_path, 'test', each[:-16] + '_style_single.npy'), int(each[:-16])]
+                           for each in os.listdir(os.path.join(dataset_path, 'test')) if
+                         'color' in each]
 
-        # self.path = sorted(self.path, key=lambda x: x[-1])
+        self.path = sorted(self.path, key=lambda x: x[-1])
         # print("number of dataset：%d"%len(self.path)
     
     def _rd_get_char(self, char_id):
@@ -469,10 +470,11 @@ class SegNetExtractNetLoader(data.Dataset):
     
     def get_seg_image(self, reference_single, seg_label):
         # print(reference_single.shape,seg_label.shape)
-        reference_image = np.zeros(shape=(33, 256, 256), dtype=float)
+        # reference_image = np.zeros(shape=(33, 256, 256), dtype=float)
+        reference_image = np.zeros(shape=(7, 256, 256), dtype=float)
         reference_image= torch.from_numpy(reference_image)
         for i in range(seg_label.shape[0]):
-            id_7 = seg_label_to7(seg_label[i])
+            id_7 = seg_label_to7_o(seg_label[i])
             # print(reference_image[id_7].shape,reference_single[i].shape)
             reference_image[id_7] = reference_image[id_7] + reference_single[i]
         return np.clip(reference_image, 0, 1)
@@ -480,7 +482,7 @@ class SegNetExtractNetLoader(data.Dataset):
     def get_data(self, idx):
         """
         """
-        
+        item = idx
         char_id = self.valid_characters[idx]
         group = self.grouped_df.get_group(char_id)
         rd_mes = self._rd_get_char(char_id)
@@ -514,7 +516,7 @@ class SegNetExtractNetLoader(data.Dataset):
             stroke_orders.append(row['stroke'] - 1)  # 转为0-based
             targets.append(row['target'])
             stroke_labels.append(row['stroke']-1)  # 真实笔画编号（1-based）
-        kaiti_ref = True
+        kaiti_ref = False
         if rd_mes:
             data_frame = np.load(rd_mes['path'])
             if kaiti_ref:
@@ -561,46 +563,90 @@ class SegNetExtractNetLoader(data.Dataset):
         
         # 转换为固定大小 (33, 256, 256)
         max_strokes = 33
+        
+        if n<max_strokes:
+            stroke_fill = stroke_fill = torch.zeros((max_strokes - n,) + strokes_tensor.shape[1:])
+            all_strokes = torch.cat([strokes_tensor, stroke_fill], dim=0)
+        else:
+            all_strokes = strokes_tensor
         # final_strokes_tensor = torch.zeros(max_strokes, 256, 256, dtype=strokes_tensor.dtype)
         # final_strokes_tensor[:len(strokes)] = strokes_tensor  # 填充实际笔画
         final_strokes_tensor = strokes_tensor
-        # reference_color = np.load(self.path[item][0])  # (3, 256, 256)
-        # label_seg = np.load(self.path[item][1])[1:]  # (7, 256, 256)
-        # target_image = np.load(self.path[item][1])[:1]  # (1, 256, 256)
-        # seg_id = np.load(self.path[item][2])     # (N)
-        # reference_transformed_single = np.load(self.path[item][3])  # (N, 256 256)
-        # target_single_stroke = np.load(self.path[item][4])  # (N, 256 256)
-        # target_data = np.repeat(target_image, 3, axis=0).astype(np.float)
-        # reference_segment_transformation_data = self.get_seg_image(reference_transformed_single, seg_id)
-        # label_seg = self.get_seg_image(target_single_stroke, seg_id)
+        reference_color = np.load(self.path[item][0])  # (3, 256, 256)
+        label_seg = np.load(self.path[item][1])[1:]  # (7, 256, 256)
+        target_image = np.load(self.path[item][1])[:1]  # (1, 256, 256)
+        seg_id = np.load(self.path[item][2])     # (N)
+        reference_transformed_single = np.load(self.path[item][3])  # (N, 256 256)
+        num_real_strokes = reference_transformed_single.shape[0]
+        # print(num_real_strokes)
+        target_single_stroke = np.load(self.path[item][4])  # (N, 256 256
+        current_channels = target_single_stroke.shape[0]
+        if current_channels < 33:
+            # 计算需要补充的零张量数量
+            pad_size = 33 - current_channels
+            # 在第一个维度（通道维度）补零
+            padded = np.pad(target_single_stroke, ((0, pad_size), (0, 0), (0, 0)), mode='constant')
+            target_single_stroke_all= padded
+        elif current_channels > 33:
+            # 如果通道数超过33，可以截断或报错
+            target_single_stroke_all = target_single_stroke[:33]  # 取前33个通道
+        target_data = np.repeat(target_image, 3, axis=0).astype(float)
+        reference_segment_transformation_data = self.get_seg_image(reference_transformed_single, seg_id)
+        label_seg = self.get_seg_image(target_single_stroke, seg_id)
 
         # print(ref_img.shape,stroke_labels_tensor.shape,strokes_tensor.shape,stroke_labels)
 
+        # print(target_single_stroke.shape)
+        # reference_segment_transformation_data = self.get_seg_image(reference_single_image, stroke_labels_tensor)
+        # zeros_tensor_reference_seg = torch.zeros_like(reference_segment_transformation_data)
+        # zero_transformed_single = torch.zeros_like(strokes_tensor)
+        # label_seg = self.get_seg_image(final_strokes_tensor, stroke_labels_tensor)
+        # if self.is_single:  # For ExtractNet
+        #     return {
+        #         'target_data': ref_img,
+        #         'reference_color':reference_color_image,
+        #         'label_seg': label_seg,
+        #         'reference_segment_transformation_data': reference_segment_transformation_data,
+        #         'seg_id':stroke_labels_tensor,
+        #         'reference_transformed_single': reference_single_image,    #strokes_tensor,
+        #         'target_single_stroke': strokes_tensor,
+        #         'stroke_num':num_real_strokes,
+
+        #     }
+        # else:  # For SegNet
+        #     return {
+
+        #         'target_data':  ref_img,
+        #         'reference_color': reference_color_image,
+        #         'label_seg':label_seg,
+        #         'target_single_stroke':all_strokes,
+        #         'stroke_num':num_real_strokes,
+        #     }
+
         
-        reference_segment_transformation_data = self.get_seg_image(reference_single_image, stroke_labels_tensor)
-        zeros_tensor_reference_seg = torch.zeros_like(reference_segment_transformation_data)
-        zero_transformed_single = torch.zeros_like(strokes_tensor)
-        label_seg = self.get_seg_image(final_strokes_tensor, stroke_labels_tensor)
         if self.is_single:  # For ExtractNet
             return {
-                'target_data': ref_img,
-                'reference_color':reference_color_image,
+                'target_data': target_data,
+                'reference_color':reference_color,
                 'label_seg': label_seg,
-                'reference_segment_transformation_data': reference_segment_transformation_data,
-                'seg_id':stroke_labels_tensor,
-                'reference_transformed_single': reference_single_image,    #strokes_tensor,
-                'target_single_stroke': strokes_tensor,
+                'reference_segment_transformation_data':reference_segment_transformation_data,
+                'seg_id': seg_id,
+                'reference_transformed_single': reference_transformed_single,
+                'target_single_stroke': target_single_stroke,
                 'stroke_num':num_real_strokes,
+                'unicode':char_id ,
 
             }
         else:  # For SegNet
             return {
 
-                'target_data':  ref_img,
-                'reference_color': reference_color_image,
-                'label_seg':label_seg
+                'target_data': target_data,
+                'reference_color': reference_color,
+                'label_seg': label_seg,
+                'target_single_stroke':target_single_stroke_all,
+                'stroke_num':num_real_strokes,
             }
-
+            
     def __len__(self):
         return len(self.valid_characters)
 
